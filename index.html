@@ -147,7 +147,7 @@ input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--lamp
   <p class="eyebrow">밤마다 둘이서</p>
   <h1>코츄 밤 파티</h1>
   <ul class="rules">
-    <li>매 판 미니게임 15개 중 하나가 나와요. 진 사람이 다음 게임을 골라요.</li>
+    <li>매 판 미니게임 18개 중 하나가 나와요. 진 사람이 다음 게임을 골라요.</li>
     <li>이기면 도토리 1개. 먼저 5개 모으면 최종 우승이에요.</li>
     <li>왼손은 화면을 밀어서 이동, 오른손은 큰 버튼 하나만 써요.</li>
   </ul>
@@ -1681,7 +1681,176 @@ const GolfG=(()=>{
       drawBubble(W/2,H*.3,C.bub.me,now)}
   }})();
 
-const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG];
+/* ================= 게임 16: 형 목 위 쟁탈전 ================= */
+const NeckG=(()=>{
+  const AW=520,AH=700,TMAX=40000,ZX=0,ZY=-60,ZR=60,GRIP=.55,GCD=1.1,SAR=[18,22];let s=null;
+  function plan(seed){const r=mulberry32(seed^0x510e527f),ev=[];let t=3+r()*1.5;while(t<TMAX/1000){const d=r()<.5?-1:1;ev.push({w:t,a:t+.75,e:t+1.4,d});t+=3+r()*2.2}return ev}
+  const roll=el=>{for(const e of s.ev){if(el>=e.w&&el<e.a)return{p:'warn',e};if(el>=e.a&&el<e.e)return{p:'roll',e}}return{p:'calm'}};
+  const inZ=p=>hyp(p.x-ZX,p.y-ZY)<ZR;
+  const sarang=el=>el>=SAR[0]&&el<SAR[1];
+  function shoved(p,e,res,who){if(p.grip>0){bubble(who,'꽉!',.6);return}p.kx=(p.kx||0)+num(e.dx)*clamp(num(e.v),0,700)*res;p.ky=(p.ky||0)+num(e.dy)*clamp(num(e.v),0,700)*res;bubble(who,'으악!',.8);if(who==='me'){C.shake=.2;beep(170,.15,'square',.05)}}
+  function body(p,who,inpx,inpy,mag,sp,dt,el,bt){
+    p.grip=Math.max(0,p.grip-dt);p.cd=Math.max(0,p.cd-dt);
+    walk(p,{mx:inpx,my:inpy,mag},sp,dt);
+    const r=roll(el);if(r.p==='roll'&&p.grip<=0){p.x+=r.e.d*330*dt;p.y+=60*dt}
+    if(sarang(el)&&hyp(p.x-ZX,p.y-ZY)<ZR+30){const dx=p.x-ZX,dy=p.y-ZY,d=hyp(dx,dy)||1;p.x+=dx/d*220*dt;p.y+=dy/d*220*dt}
+    p.x=clamp(p.x,-AW/2+PR,AW/2-PR);p.y=clamp(p.y,-AH/2+120,AH/2-PR);
+    if(p.x<-AW/2+PR+2||p.x>AW/2-PR-2){if(!p.fell){p.fell=1;bubble(who,'떨어졌다!',.8)}}else p.fell=0}
+  return{
+    id:'neck',name:'형 목 위 쟁탈전',btn:'꽉!',stat:'pow',stick:true,
+    rules:['형 목 위 안마기 자리(반짝이는 원)에 혼자 있으면 점수가 올라요. 둘 다 있으면 조금씩만 올라요.','형이 으음… 하고 뒤척이면 옆으로 쓸려나가요. 그 순간 꽉!을 누르면 버텨요. 꽉!은 상대 쪽으로 박치기도 돼요.','중간에 진짜 사랑이가 나타나 내 자리야! 하고 둘 다 밀어내요. 40초 뒤 점수가 높은 쪽이 이겨요.'],
+    init(o){const a=o.me?1:-1;s={o,t0:o.now,ev:plan(o.seed),d:derive(o.myC),od:derive(o.oppC),me:{x:a*120,y:150,grip:0,cd:0,sc:0},op:{x:-a*120,y:150,grip:0,cd:0,sc:0,ok:o.bot},ended:false,endAt:0,lastP:'calm',sar:false,bot:o.bot?{rt:-1,cd:0}:null}},
+    step(dt,now,inp){const el=(now-s.t0)/1000,m=s.me,op=s.op,r=roll(el);
+      if(r.p!==s.lastP){if(r.p==='warn'){bigText('으음… 형이 뒤척여요!',true,700,true);beep(110,.4,'sine',.05)}if(r.p==='roll'){beep(80,.5,'sawtooth',.06);C.shake=.2}s.lastP=r.p}
+      if(sarang(el)&&!s.sar){s.sar=true;bigText('진짜 사랑이: 형 목은 내 자리야!',true,1300,true)}
+      if(!s.ended&&el*1000>=TMAX){s.ended=true;s.endAt=now;bigText('끝!',false,900)}
+      if(s.ended)return;
+      if(inp.pressed&&m.cd<=0){m.grip=GRIP;m.cd=GCD;bubble('me','꽉!',.6);beep(520,.08,'square',.05);const dx=op.x-m.x,dy=op.y-m.y,d=hyp(dx,dy)||1;
+        if(op.ok&&d<PR*2+26){sendEv({k:'shove',dx:Math.round(dx/d*1000)/1000,dy:Math.round(dy/d*1000)/1000,v:Math.round(s.d.barkV*.9)});ring(op.x,op.y,'#ffd59a',40)}}
+      body(m,'me',inp.mx,inp.my,inp.mag,s.d.speed*.85,dt,el);if(op.ok){const dx=m.x-op.x,dy=m.y-op.y,d=hyp(dx,dy);if(d<PR*2&&d>.01){const pw=CHARS[s.o.oppC].st.pow/(CHARS[s.o.myC].st.pow+CHARS[s.o.oppC].st.pow);m.x+=dx/d*(PR*2-d)*pw;m.y+=dy/d*(PR*2-d)*pw}}
+      const mi=inZ(m)&&!sarang(el),oi=op.ok&&inZ(op)&&!sarang(el);if(mi)m.sc+=dt*(oi?.3:1);
+      if(s.bot){const b=op,bt=s.bot;b.grip=Math.max(0,b.grip-dt);bt.cd=Math.max(0,bt.cd-dt);
+        if(r.p==='roll'&&bt.rt<0)bt.rt=.08+Math.random()*.35;if(bt.rt>=0){bt.rt-=dt;if(bt.rt<0&&b.cd<=0&&Math.random()<.7){b.grip=GRIP;b.cd=GCD;bubble('op','꽉!',.6)}}if(r.p!=='roll')bt.rt=-1;
+        if(b.cd<=0&&r.p==='calm'&&hyp(m.x-b.x,m.y-b.y)<PR*2+20&&Math.random()<dt*1.5){b.cd=GCD;b.grip=GRIP;bubble('op','꽉!',.6);const dx=m.x-b.x,dy=m.y-b.y,d=hyp(dx,dy)||1;shoved(m,{dx:dx/d,dy:dy/d,v:s.od.barkV*.9},s.d.res,'me')}
+        const tx=sarang(el)?ZX+(b.x<0?-140:140):ZX+Math.sin(el*1.7)*18,ty=sarang(el)?ZY+40:ZY;const dx=tx-b.x,dy=ty-b.y,l=hyp(dx,dy);
+        body(b,'op',l>4?dx/l:0,l>4?dy/l:0,l>4?1:0,s.od.speed*.8,dt,el);const dx2=b.x-m.x,dy2=b.y-m.y,d2=hyp(dx2,dy2);if(d2<PR*2&&d2>.01){const pw=CHARS[s.o.myC].st.pow/(CHARS[s.o.myC].st.pow+CHARS[s.o.oppC].st.pow);b.x+=dx2/d2*(PR*2-d2)*pw;b.y+=dy2/d2*(PR*2-d2)*pw}
+        if(oi)b.sc+=dt*(mi?.3:1)}
+      else smooth(op,dt,14)},
+    onRemote(g){remoteTo(s.op,g,-AW,-AH,AW,AH);s.op.sc=num(g.sc);s.op.grip=g.gr?1:0},
+    onEv(e){if(e.k==='shove'&&!s.ended){bubble('op','꽉!',.6);shoved(s.me,e,s.d.res,'me')}},
+    botHear(e){if(e.k==='shove')shoved(s.op,e,s.od.res,'op')},
+    state(){return{x:Math.round(s.me.x),y:Math.round(s.me.y),sc:Math.round(s.me.sc*10)/10,gr:s.me.grip>0?1:0}},
+    result(now){if(!s.ended||now-s.endAt<700)return null;const a=Math.round(s.me.sc*10),b=Math.round(s.op.sc*10);return a===b?'draw':(a>b?'me':'opp')},
+    summary(){return'목 위에 있던 점수 나 '+s.me.sc.toFixed(1)+' · '+opName()+' '+s.op.sc.toFixed(1)},
+    hud(now){const el=(now-s.t0)/1000,sec=Math.ceil(Math.max(0,TMAX/1000-el)),r=roll(el).p;return{t:'0:'+String(sec).padStart(2,'0'),low:sec<=8,c:(r==='roll'?'지금 꽉!':r==='warn'?'곧 뒤척여요':sarang(el)?'사랑이 등장!':'자리 지켜요')+' '+s.me.sc.toFixed(0)+':'+s.op.sc.toFixed(0),cls:r==='calm'?'go':'it'}},
+    button(){return{label:'꽉!',cd:s.me.cd/GCD}},
+    draw(now){const t=now/1000,el=(now-s.t0)/1000,z=Math.min(W/(AW+20),(H-150)/(AH+20)),r=roll(el),sh=C.shake*22,tilt=r.p==='roll'?r.e.d*.05*Math.sin(t*20):0;
+      screen();ctx.fillStyle='#17152b';ctx.fillRect(0,0,W,H);cam(0,0,z,(Math.random()-.5)*sh,(Math.random()-.5)*sh+12);ctx.rotate(tilt);
+      ctx.fillStyle=pat(PLANK);ctx.fillRect(-AW,-AH,AW*2,AH*2);ctx.fillStyle='#8a5a30';rr(-AW/2-14,-AH/2,AW+28,AH+14,22);ctx.fill();ctx.fillStyle='#4a6fa8';rr(-AW/2,-AH/2+10,AW,AH-6,18);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.08)';for(let y=-AH/2+40;y<AH/2;y+=60)ctx.fillRect(-AW/2,y,AW,3);
+      ctx.fillStyle='#efe3cf';rr(-120,-AH/2+20,240,90,30);ctx.fill();
+      ctx.fillStyle='#e8c3a0';ctx.beginPath();ctx.ellipse(0,-AH/2+82,62,56,0,0,7);ctx.fill();ctx.fillStyle='#3a2a20';ctx.beginPath();ctx.ellipse(0,-AH/2+56,64,34,0,Math.PI,0);ctx.fill();
+      ctx.strokeStyle='#3a2a20';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-26,-AH/2+86);ctx.lineTo(-12,-AH/2+86);ctx.moveTo(12,-AH/2+86);ctx.lineTo(26,-AH/2+86);ctx.stroke();
+      ctx.fillStyle='#f6ecdc';ctx.font='15px Jua, sans-serif';ctx.textAlign='center';ctx.fillText(r.p==='calm'?'형 (쿨쿨)':'형 (으음…)',0,-AH/2+160);
+      ctx.fillStyle='#6b8fd0';rr(-AW/2+30,ZY+50,AW-60,AH/2-ZY-60,40);ctx.fill();
+      const zg=ctx.createRadialGradient(ZX,ZY,10,ZX,ZY,ZR);zg.addColorStop(0,'rgba(255,213,154,.55)');zg.addColorStop(1,'rgba(255,213,154,.1)');ctx.fillStyle=zg;ctx.beginPath();ctx.arc(ZX,ZY,ZR,0,7);ctx.fill();ctx.strokeStyle='rgba(255,213,154,'+(.5+.3*Math.sin(t*4)).toFixed(2)+')';ctx.lineWidth=4;ctx.setLineDash([8,6]);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='rgba(255,213,154,.9)';ctx.font='13px Jua, sans-serif';ctx.fillText('형 목 위 (안마기 자리)',ZX,ZY-ZR-8);
+      if(r.p==='roll'){ctx.fillStyle='rgba(255,255,255,.5)';ctx.font='40px Jua, sans-serif';ctx.fillText(r.e.d>0?'→ → →':'← ← ←',0,ZY+120)}
+      if(sarang(el)){const k=Math.min(1,(el-SAR[0])*3);drawToken(ZX,ZY,0,{scale:1.6*k,label:'진짜 사랑이',col:'#ffd59a'})}
+      const tk=(p,ci,who,col)=>{if(!p.ok&&who==='op')return;drawToken(p.x,p.y,ci,{label:who==='me'?'나':opName(),col,bob:p.bob,tilt:p.tilt});if(p.grip>0){ctx.strokeStyle='rgba(255,213,154,.9)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(p.x,p.y,PR+9,0,7);ctx.stroke()}drawBubble(p.x,p.y,C.bub[who],now)};
+      tk(s.op,s.o.oppC,'op',opCol());tk(s.me,s.o.myC,'me');drawParts();screen()}
+  }})();
+
+/* ================= 게임 17: 거짓말쟁이를 찾아라 ================= */
+const LiarG=(()=>{
+  const NP=5,WIN=3,PT=30,REV=3.2;let s=null;
+  const CASES=[['사랑이 도토리를 먹은','도토리 먹은'],['망덩이 산딸기를 몰래 먹은','산딸기 먹은'],['형 양말을 숨긴','양말 숨긴'],['누나 머리핀을 가져간','머리핀 가져간'],['형 베개를 차지한','베개 차지한'],['테디 간식을 훔친','간식 훔친']];
+  function claims(n,me){return[{t:'is',x:n},{t:'not',x:n},{t:'self'},{t:'notme_is',x:n}]}
+  function truth(st,speaker,cul){if(st.t==='is')return cul===st.x;if(st.t==='not')return cul!==st.x;if(st.t==='self')return cul!==speaker;if(st.t==='either')return cul===st.x||cul===st.y;return true}
+  function gen(r,ids){for(let tries=0;tries<400;tries++){const cul=Math.floor(r()*4),liar=Math.floor(r()*4),st=[];
+      for(let i=0;i<4;i++){const opts=[];for(let x=0;x<4;x++){if(x!==i){opts.push({t:'is',x});opts.push({t:'not',x})}}opts.push({t:'self'});for(let x=0;x<4;x++)for(let y=x+1;y<4;y++)if(x!==i&&y!==i)opts.push({t:'either',x,y});
+        const want=i!==liar;const ok=opts.filter(o=>truth(o,i,cul)===want);st.push(ok[Math.floor(r()*ok.length)])}
+      let sols=[];for(let c=0;c<4;c++){const f=st.map((o,i)=>truth(o,i,c)?0:1);if(f.reduce((a,b)=>a+b,0)===1)sols.push({c,l:f.indexOf(1)})}
+      if(sols.length===1&&sols[0].l===liar&&sols[0].c===cul)return{st,cul,liar,cs:CASES[Math.floor(r()*CASES.length)]}}
+    return null}
+  const bat=w=>{const c=w.charCodeAt(w.length-1)-0xAC00;return c>=0&&c<11172&&c%28!==0};function say(st,i,P){const nm=k=>CHARS[P.ids[k]].name,c=P.cs[1];if(st.t==='is')return nm(st.x)+(bat(nm(st.x))?'이':'가')+' '+c+' 범인이야!';if(st.t==='not')return nm(st.x)+(bat(nm(st.x))?'은':'는')+' 범인 아니야.';if(st.t==='self')return'나는 절대 아니야!';if(st.t==='either')return'범인은 '+nm(st.x)+' 아니면 '+nm(st.y)+'야.';return''}
+  function build(){let el=$('#liar');if(!el){el=document.createElement('div');el.id='liar';document.body.appendChild(el);
+      const st=document.createElement('style');st.textContent='#liar{position:fixed;z-index:6;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 54px);bottom:calc(130px + env(safe-area-inset-bottom,0px));max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:10px;overflow:auto}#liar .q{background:#fbf1de;color:#2b1b0b;border-radius:16px;padding:12px 14px;font:18px/1.35 var(--f-disp)}#liar .q small{display:block;font:13px var(--f-body);color:#7a5a3a;margin-top:4px}#liar .g{display:grid;grid-template-columns:1fr 1fr;gap:10px}#liar button{background:var(--sheet);border:2px solid var(--line);border-radius:16px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--ink);font:15px var(--f-body);min-width:0;text-align:center}#liar button .face{width:52px;height:52px;border:3px solid #ffd59a}#liar button b{font:16px var(--f-disp);font-weight:normal}#liar button span.say{background:#fff;color:#2b1b0b;border-radius:10px;padding:6px 8px;font-size:14px;line-height:1.35;width:100%;box-sizing:border-box}#liar button.mine{border-color:#ff8a68}#liar button.theirs{box-shadow:0 0 0 3px #7ec6ff inset}#liar button.liar{background:#5a2a35;border-color:#ff5a5f}#liar button[disabled]{opacity:.75}#liar .stl{font:15px var(--f-disp);color:var(--lamp);text-align:center;min-height:1.4em}';document.head.appendChild(st)}
+    el.hidden=false;return el}
+  function render(){const el=build(),P=s.ps[s.pi];if(!P){el.innerHTML='';return}const rev=s.res[s.pi]!=null;
+    el.innerHTML='<div class="q">'+(s.pi+1)+'번 사건 · '+P.cs[0]+' 범인을 두고 4명이 말해요. <b>딱 한 명만 거짓말</b>을 했어요. 거짓말쟁이는?<small>먼저 맞히면 1점. 틀리면 이번 사건은 못 골라요.</small></div><div class="g"></div><div class="stl"></div>';
+    const g=el.querySelector('.g');P.ids.forEach((ci,i)=>{const b=document.createElement('button');b.type='button';b.innerHTML='<span class="face">'+faceHTML(ci)+'</span><b>'+CHARS[ci].name+'</b><span class="say">'+say(P.st[i],i,P)+'</span>';
+      if(s.myPick[s.pi]===i)b.classList.add('mine');if(s.opPick[s.pi]===i)b.classList.add('theirs');if(rev&&i===P.liar)b.classList.add('liar');b.disabled=rev||s.myPick[s.pi]!=null;b.addEventListener('click',()=>pick(i));g.appendChild(b)});
+    const stl=el.querySelector('.stl');if(rev){const w=s.res[s.pi];stl.textContent=(w==='me'?'내가 맞혔어요! ':w==='op'?opName()+'가 맞혔어요. ':'아무도 못 맞혔어요. ')+'거짓말쟁이는 '+CHARS[P.ids[P.liar]].name+', 범인은 '+CHARS[P.ids[P.cul]].name+'!'}
+    else if(s.myPick[s.pi]!=null)stl.textContent=s.myPick[s.pi]===P.liar?'정답!':'틀렸어요… '+opName()+' 차례를 기다려요';else stl.textContent='남은 시간 '+Math.max(0,Math.ceil(PT-(performance.now()-s.pStart)/1000))+'초'}
+  function pick(i){if(s.myPick[s.pi]!=null||s.res[s.pi]!=null)return;const t=Math.round((performance.now()-s.pStart)/10)/100;s.myPick[s.pi]=i;s.myT[s.pi]=t;const ok=i===s.ps[s.pi].liar;beep(ok?990:180,.15,ok?'triangle':'sawtooth',.06);sendEv({k:'pick',p:s.pi,i,t});render()}
+  function settle(now){const i=s.pi,P=s.ps[i];if(s.res[i]!=null)return;const a=s.myPick[i],b=s.opPick[i],ac=a!=null&&a===P.liar,bc=b!=null&&b===P.liar,el=(now-s.pStart)/1000;let w=null;
+    if(ac&&bc)w=(s.myT[i]<s.opT[i]||(s.myT[i]===s.opT[i]&&s.o.me===0))?'me':'op';
+    else if(ac&&(b!=null||el>s.myT[i]+1.2))w='me';
+    else if(bc&&(a!=null||el>s.opT[i]+1.2))w='op';
+    else if(a!=null&&b!=null)w='none';
+    else if(el>PT)w='none';
+    if(w){s.res[i]=w;if(w==='me'){s.sc++;confetti(W/2,H/2,24);beep(990,.2,'triangle',.07)}if(w==='op')s.osc++;s.revAt=now;render()}}
+  return{
+    id:'liar',name:'거짓말쟁이를 찾아라',btn:'고르기',stat:null,tap:false,
+    rules:['사건이 일어났어요. 인형 4명이 한 마디씩 하는데, 그중 딱 한 명만 거짓말을 해요.','말들을 맞춰보고 거짓말쟁이를 먼저 누르면 1점! 틀리면 그 사건은 더 못 골라요.','3점 먼저 따면 이겨요. 문제는 답이 딱 하나만 나오게 만들어져 있어요.'],
+    init(o){const r=mulberry32(o.seed^0x9b05688c),pool=CHARS.map((_,i)=>i);s={o,t0:o.now,ps:[],pi:0,myPick:[],opPick:[],myT:[],opT:[],res:[],sc:0,osc:0,pStart:o.now,revAt:0,ended:false,endAt:0,bot:o.bot?{at:0,plan:[]}:null};
+      for(let k=0;k<NP;k++){const ids=shuffle(pool.slice(),r).slice(0,4);const P=gen(r,ids);if(P){P.ids=ids;s.ps.push(P)}}
+      if(o.bot)s.bot.plan=s.ps.map(P=>({at:6+Math.random()*10,ok:Math.random()<.75,P}));render()},
+    cleanup(){const el=$('#liar');if(el)el.hidden=true},
+    step(dt,now,inp){if(s.ended){return}const P=s.ps[s.pi];if(!P){s.ended=true;s.endAt=now;return}
+      if(s.res[s.pi]==null){if(s.bot&&s.opPick[s.pi]==null){const bp=s.bot.plan[s.pi];if((now-s.pStart)/1000>=bp.at){let c=bp.ok?P.liar:[0,1,2,3].filter(x=>x!==P.liar)[Math.floor(Math.random()*3)];if(s.myPick[s.pi]!=null&&s.myPick[s.pi]!==P.liar&&c===s.myPick[s.pi])c=P.liar;s.opPick[s.pi]=c;s.opT[s.pi]=Math.round((now-s.pStart)/10)/100;render()}}
+        settle(now);if(Math.floor((now-s.pStart)/1000)!==s.lastSec){s.lastSec=Math.floor((now-s.pStart)/1000);render()}}
+      else if(now-s.revAt>REV*1000){if(s.sc>=WIN||s.osc>=WIN||s.pi+1>=s.ps.length){s.ended=true;s.endAt=now;bigText('끝!',false,900);return}s.pi++;s.pStart=now;render()}},
+    onRemote(g){},
+    onEv(e){if(e.k==='pick'){const p=Math.floor(num(e.p,-1));if(p>=0&&p<s.ps.length&&s.opPick[p]==null){s.opPick[p]=clamp(Math.floor(num(e.i)),0,3);s.opT[p]=num(e.t,99);if(p===s.pi)render()}}},
+    botHear(e){},
+    state(){return{pi:s.pi}},
+    result(now){if(!s.ended||now-s.endAt<600)return null;return s.sc===s.osc?'draw':(s.sc>s.osc?'me':'opp')},
+    summary(){return'맞힌 사건 나 '+s.sc+'개 · '+opName()+' '+s.osc+'개'},
+    hud(now){return{t:Math.min(s.pi+1,NP)+'번 사건',c:'나 '+s.sc+' : '+s.osc+' '+opName(),cls:'go'}},
+    button(){return{label:'고르기',off:true}},
+    draw(now){screen();const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1d1a33');g.addColorStop(1,'#2b2241');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);drawParts()}
+  }})();
+
+/* ================= 게임 18: 토토를 찾아라 ================= */
+const TotoG=(()=>{
+  const NR=5,WIN=3,RT=20,REV=2.6,N=10;let s=null;
+  const F={fur:['#b9783f','#a1622f','#c98f55'],ear:['round','point','tuft'],cheek:[null,'#ff9fb0','#ffb38a'],eye:['dot','big','sleepy'],nose:['#3a2418','#e07a8a'],stripe:[0,1,2],mark:[null,'spot','star'],acorn:[false,true],tooth:[false,true]};
+  const KEYS=Object.keys(F);
+  function rnd(r){const o={};KEYS.forEach(k=>o[k]=F[k][Math.floor(r()*F[k].length)]);return o}
+  const same=(a,b)=>KEYS.every(k=>a[k]===b[k]);
+  function round(r,ri){const target=rnd(r),list=[target],nd=ri<2?2:1;let g=0;
+    while(list.length<N&&g++<500){const d=Object.assign({},target),ks=shuffle(KEYS.slice(),r).slice(0,nd);ks.forEach(k=>{const opts=F[k].filter(v=>v!==target[k]);d[k]=opts[Math.floor(r()*opts.length)]});if(!list.some(x=>same(x,d)))list.push(d)}
+    const order=shuffle(list.map((_,i)=>i),r);return{list:order.map(i=>list[i]),ans:order.indexOf(0),target,show:Math.max(.7,1.5-ri*.18)}}
+  function drawSq(x,y,sc,o,t){ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);
+    ctx.fillStyle=o.fur;ctx.beginPath();ctx.moveTo(18,22);ctx.bezierCurveTo(46,10,48,-34,22,-40);ctx.bezierCurveTo(40,-20,30,6,10,14);ctx.fill();
+    if(o.stripe){ctx.strokeStyle='rgba(255,240,220,.7)';ctx.lineWidth=3;for(let i=0;i<o.stripe;i++){ctx.beginPath();ctx.moveTo(26+i*5,-24+i*12);ctx.quadraticCurveTo(36,-14+i*10,30,0+i*8);ctx.stroke()}}
+    ctx.fillStyle=o.fur;ctx.beginPath();ctx.ellipse(0,14,16,15,0,0,7);ctx.fill();ctx.fillStyle='#f3dcc0';ctx.beginPath();ctx.ellipse(0,18,9,10,0,0,7);ctx.fill();
+    const ear=(sx)=>{ctx.fillStyle=o.fur;ctx.beginPath();if(o.ear==='round'){ctx.arc(sx*11,-17,6,0,7)}else{ctx.moveTo(sx*6,-14);ctx.lineTo(sx*13,-29);ctx.lineTo(sx*17,-13)}ctx.fill();if(o.ear==='tuft'){ctx.strokeStyle=o.fur;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(sx*13,-29);ctx.lineTo(sx*15,-35);ctx.moveTo(sx*13,-29);ctx.lineTo(sx*11,-35);ctx.stroke()}};ear(-1);ear(1);
+    ctx.fillStyle=o.fur;ctx.beginPath();ctx.ellipse(0,-6,17,15,0,0,7);ctx.fill();ctx.fillStyle='#f3dcc0';ctx.beginPath();ctx.ellipse(0,0,10,7,0,0,7);ctx.fill();
+    if(o.mark==='spot'){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,-15,3,0,7);ctx.fill()}if(o.mark==='star'){ctx.fillStyle='#ffd166';ctx.beginPath();for(let i=0;i<10;i++){const a=i*Math.PI/5-Math.PI/2,r2=i%2?1.6:3.8;ctx.lineTo(Math.cos(a)*r2,-15+Math.sin(a)*r2)}ctx.fill()}
+    ctx.fillStyle='#17152b';if(o.eye==='dot'){ctx.beginPath();ctx.arc(-6,-7,2,0,7);ctx.arc(6,-7,2,0,7);ctx.fill()}else if(o.eye==='big'){ctx.beginPath();ctx.arc(-6,-7,3.4,0,7);ctx.arc(6,-7,3.4,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-5,-8,1.2,0,7);ctx.arc(7,-8,1.2,0,7);ctx.fill()}else{ctx.strokeStyle='#17152b';ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(-6,-8,2.6,.2,Math.PI-.2);ctx.moveTo(8.6,-8);ctx.arc(6,-8,2.6,.2,Math.PI-.2);ctx.stroke()}
+    if(o.cheek){ctx.fillStyle=o.cheek;ctx.globalAlpha=.8;ctx.beginPath();ctx.ellipse(-10,-1,3,2,0,0,7);ctx.ellipse(10,-1,3,2,0,0,7);ctx.fill();ctx.globalAlpha=1}
+    ctx.fillStyle=o.nose;ctx.beginPath();ctx.ellipse(0,-2,2.2,1.6,0,0,7);ctx.fill();if(o.tooth){ctx.fillStyle='#fff';ctx.fillRect(-1.6,1.5,3.2,3.2)}
+    if(o.acorn){ctx.save();ctx.translate(-12,16);ctx.scale(.7,.7);ctx.fillStyle='#c4863f';ctx.beginPath();ctx.ellipse(0,2,6,8,0,0,7);ctx.fill();ctx.fillStyle='#6b4a2a';ctx.beginPath();ctx.ellipse(0,-3,7,4.5,0,Math.PI,0);ctx.fill();ctx.restore()}
+    ctx.restore()}
+  function layout(){const cols=2,rows=5,top=70,bot=150,cw=(W-32)/cols,ch=(H-top-bot)/rows;return{cols,cw,ch,top,cell:i=>[16+(i%cols+.5)*cw,top+(Math.floor(i/cols)+.5)*ch]}}
+  const curStart=()=>s.rStart+s.rs[s.ri].show*1000+900;
+  function settle(now){const i=s.ri,R=s.rs[i];if(s.res[i]!=null)return;const a=s.myPick[i],b=s.opPick[i],ac=a!=null&&a===R.ans,bc=b!=null&&b===R.ans,el=(now-curStart())/1000;let w=null;
+    if(ac&&bc)w=(s.myT[i]<s.opT[i]||(s.myT[i]===s.opT[i]&&s.o.me===0))?'me':'op';else if(ac&&(b!=null||el>s.myT[i]+1.2))w='me';else if(bc&&(a!=null||el>s.opT[i]+1.2))w='op';else if(a!=null&&b!=null)w='none';else if(el>RT)w='none';
+    if(w){s.res[i]=w;if(w==='me'){s.sc++;confetti(W/2,H/2,24);beep(990,.2,'triangle',.07)}if(w==='op')s.osc++;s.revAt=now;bigText(w==='me'?'진짜 토토 찾았다!':w==='op'?opName()+'가 먼저 찾았어요':'아무도 못 찾았어요',true,1300,w==='op')}}
+  return{
+    id:'toto',name:'토토를 찾아라',btn:'고르기',stat:null,tapPos:true,
+    rules:['사랑이 도토리를 안 갚고 숨은 다람쥐 토토를 찾아요. 처음에 진짜 토토 얼굴을 아주 잠깐 보여줘요.','그다음 비슷하게 생긴 다람쥐 10마리가 나와요. 귀, 볼, 눈, 꼬리 줄무늬, 이마 무늬, 앞니, 도토리를 잘 봐요.','먼저 진짜 토토를 누르면 1점! 틀리면 그 판은 못 골라요. 3점 먼저면 승리, 판이 갈수록 어려워져요.'],
+    init(o){const r=mulberry32(o.seed^0x1f83d9ab);s={o,t0:o.now,rs:Array.from({length:NR},(_,i)=>round(r,i)),ri:0,rStart:o.now,myPick:[],opPick:[],myT:[],opT:[],res:[],sc:0,osc:0,revAt:0,ended:false,endAt:0,bot:o.bot?{plan:Array.from({length:NR},()=>({at:2.5+Math.random()*6,ok:Math.random()<.7}))}:null}},
+    step(dt,now,inp){if(s.ended)return;const R=s.rs[s.ri],st=curStart(),el=(now-st)/1000;
+      if(s.res[s.ri]==null){
+        if(now>=st&&inp.tap&&s.myPick[s.ri]==null){const L=layout();R.list.forEach((o,i)=>{const [cx,cy]=L.cell(i);if(Math.abs(inp.tap[0]-cx)<L.cw/2-4&&Math.abs(inp.tap[1]-cy)<L.ch/2-4&&s.myPick[s.ri]==null){s.myPick[s.ri]=i;s.myT[s.ri]=Math.round(el*100)/100;const ok=i===R.ans;beep(ok?990:180,.15,ok?'triangle':'sawtooth',.06);if(!ok)bubble('me','앗, 가짜다!',1);sendEv({k:'tp',p:s.ri,i,t:s.myT[s.ri]})}})}
+        if(s.bot&&now>=st&&s.opPick[s.ri]==null){const bp=s.bot.plan[s.ri];if(el>=bp.at){let c=bp.ok?R.ans:[...Array(N).keys()].filter(x=>x!==R.ans)[Math.floor(Math.random()*(N-1))];s.opPick[s.ri]=c;s.opT[s.ri]=Math.round(el*100)/100}}
+        if(now>=st)settle(now)}
+      else if(now-s.revAt>REV*1000){if(s.sc>=WIN||s.osc>=WIN||s.ri+1>=NR){s.ended=true;s.endAt=now;return}s.ri++;s.rStart=now}},
+    onRemote(g){},
+    onEv(e){if(e.k==='tp'){const p=Math.floor(num(e.p,-1));if(p>=0&&p<NR&&s.opPick[p]==null){s.opPick[p]=clamp(Math.floor(num(e.i)),0,N-1);s.opT[p]=num(e.t,99)}}},
+    botHear(e){},
+    state(){return{ri:s.ri}},
+    result(now){if(!s.ended||now-s.endAt<500)return null;return s.sc===s.osc?'draw':(s.sc>s.osc?'me':'opp')},
+    summary(){return'찾은 토토 나 '+s.sc+'번 · '+opName()+' '+s.osc+'번'},
+    hud(now){const st=curStart(),pre=now<st;return{t:(s.ri+1)+'/'+NR+'판',c:pre?'진짜 토토를 기억해요!':'나 '+s.sc+' : '+s.osc+' '+opName(),cls:pre?'it':'go'}},
+    button(){return{label:'고르기',off:true}},
+    draw(now){const t=now/1000,R=s.rs[s.ri],st=curStart(),L=layout();screen();const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#24402c');g.addColorStop(1,'#3a2a1c');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+      const showEnd=s.rStart+R.show*1000;
+      if(now<showEnd&&s.res[s.ri]==null){ctx.fillStyle='rgba(255,213,154,.15)';ctx.beginPath();ctx.arc(W/2,H*.45,150,0,7);ctx.fill();drawSq(W/2,H*.45,4.2,R.target,t);ctx.fillStyle='#ffd59a';ctx.font='26px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('이게 진짜 토토!',W/2,H*.45-170)}
+      else if(now<st){ctx.fillStyle='#f6ecdc';ctx.font='30px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('토토가 숨었어요…',W/2,H*.45)}
+      else{R.list.forEach((o,i)=>{const [cx,cy]=L.cell(i),mine=s.myPick[s.ri]===i,theirs=s.opPick[s.ri]===i&&s.res[s.ri]!=null,rev=s.res[s.ri]!=null&&i===R.ans;
+        ctx.fillStyle=rev?'rgba(255,213,154,.35)':'rgba(255,255,255,.06)';rr(cx-L.cw/2+4,cy-L.ch/2+4,L.cw-8,L.ch-8,14);ctx.fill();
+        if(mine||theirs){ctx.strokeStyle=mine?'#ff8a68':'#7ec6ff';ctx.lineWidth=4;rr(cx-L.cw/2+4,cy-L.ch/2+4,L.cw-8,L.ch-8,14);ctx.stroke()}
+        const sc=Math.min(L.cw,L.ch)/85;drawSq(cx,cy+4,sc,o,t);if(rev){ctx.fillStyle='#ffd59a';ctx.font='14px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('진짜 토토',cx,cy-L.ch/2+20)}})
+        if(s.myPick[s.ri]!=null&&s.res[s.ri]==null&&s.myPick[s.ri]!==R.ans){ctx.fillStyle='rgba(23,21,43,.55)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#f6ecdc';ctx.font='20px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('틀렸어요… '+opName()+' 차례',W/2,H/2)}}
+      drawBubble(W/2,H-160,C.bub.me,now);drawParts()}
+  }})();
+
+const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG];
 
 /* ================= 입력 ================= */
 const In={mx:0,my:0,mag:0,pressed:false,held:false};const J={active:false,id:-1,ox:0,oy:0,sx:0,sy:0,dx:0,dy:0,mag:0};const K={};
@@ -1870,7 +2039,7 @@ function renderSnd(){const b=$('#snd');b.classList.toggle('off',MUTED);b.setAttr
 $('#snd').addEventListener('click',e=>{e.stopPropagation();MUTED=!MUTED;try{localStorage.setItem('kochu.mute',MUTED?'1':'0')}catch(_){}audioInit();if(MASTER)MASTER.gain.value=MUTED?0:1;renderSnd()});
 $('#snd').addEventListener('pointerdown',e=>e.stopPropagation());
 renderSnd();buildPicks();probe();
-if(location.hash==='#debug'){window.__C=C;window.__spot=()=>SpotG;window.__G=()=>C.G;window.__GAMES=GAMES;window.__In=In;window.__force=null}
+if(location.hash==='#debug'){window.__C=C;window.__spot=()=>SpotG;window.__G=()=>C.G;window.__Liar=()=>LiarG;window.__GAMES=GAMES;window.__In=In;window.__force=null}
 requestAnimationFrame(frame);
 })();
 </script>
