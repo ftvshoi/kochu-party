@@ -395,9 +395,28 @@ const TagG=(()=>{
     const inC=(x,y)=>x>0&&y>0&&x<GW-1&&y<GH-1;
     for(let y=1;y<GH-1;y+=2)for(let x=1;x<GW-1;x+=2){let o=0;for(const [dx,dy] of DIRS)if(!g[ix(x+dx,y+dy)])o++;if(o===1){const c=DIRS.filter(([dx,dy])=>g[ix(x+dx,y+dy)]===1&&inC(x+dx*2,y+dy*2));if(c.length){const [dx,dy]=c[Math.floor(r()*c.length)];g[ix(x+dx,y+dy)]=0}}}
     for(let y=1;y<GH-1;y++)for(let x=1;x<GW-1;x++){if(g[ix(x,y)]!==1)continue;let a=-1,b=-1;if(x%2===1&&y%2===0){a=ix(x,y-1);b=ix(x,y+1)}else if(x%2===0&&y%2===1){a=ix(x-1,y);b=ix(x+1,y)}if(a>=0&&!g[a]&&!g[b]&&r()<.1)g[ix(x,y)]=0}
-    const cells=[];for(let y=1;y<GH-1;y+=2)for(let x=1;x<GW-1;x+=2)if(x+y>6&&(GW-1-x)+(GH-1-y)>6)cells.push([x,y]);shuffle(cells,r);
-    const KS=['acorn','ghost','acorn','ice'],tn=cells.slice(12,16).map(([x,y])=>({x:(x+.5)*T,y:(y+.5)*T}));
-    return{w:GW,h:GH,g,acorns:cells.slice(0,12).map(([x,y],i)=>({x:(x+.5)*T,y:(y+.5)*T,t:2.5+i*3.1,k:KS[i%4]})),tun:[[tn[0],tn[1]],[tn[2],tn[3]]]}}
+    const kind=(seed>>>7)%4;if(kind){const g2=themeGrid(kind,mulberry32(seed^0x7a3)),G2={w:GW,h:GH,g:g2};if(conn(G2))g.set(g2);else return Object.assign(gen2(g,r,seed),{kind:0})}
+    return Object.assign(gen2(g,r,seed),{kind})}
+  function conn(G){G={w:GW,h:GH,g:G.g};let sx=-1,sy=-1;for(let i=0;i<GW*GH;i++)if(!G.g[i]){sx=i%GW;sy=Math.floor(i/GW);break}const d=gBfs(G,sx,sy);for(let i=0;i<GW*GH;i++)if(!G.g[i]&&d[i]<0)return false;return true}
+  function themeGrid(kind,r){const g=new Uint8Array(GW*GH),ix=(x,y)=>y*GW+x;for(let x=0;x<GW;x++){g[ix(x,0)]=1;g[ix(x,GH-1)]=1}for(let y=0;y<GH;y++){g[ix(0,y)]=1;g[ix(GW-1,y)]=1}
+    const safe=(x,y)=>(x<=3&&y<=3)||(x>=GW-4&&y>=GH-4);
+    if(kind===1){for(let y=2;y<GH-2;y++)for(let x=2;x<GW-2;x++)if(!safe(x,y)&&r()<.17&&!(x%2===0&&y%2===0&&r()<.5))g[ix(x,y)]=1}
+    else if(kind===2){for(let k=1;k<=3;k++){const x0=3*k,y0=3*k+1,x1=GW-1-3*k,y1=GH-2-3*k;if(x1-x0<3)break;const ring=[];for(let x=x0;x<=x1;x++){ring.push([x,y0]);ring.push([x,y1])}for(let y=y0+1;y<y1;y++){ring.push([x0,y]);ring.push([x1,y])}
+        ring.forEach(([x,y])=>g[ix(x,y)]=1);const gaps=2+Math.floor(r()*2);for(let q=0;q<gaps;q++){const [x,y]=ring[Math.floor(r()*ring.length)];g[ix(x,y)]=0;const hz=y===y0||y===y1;if(hz){if(x+1<=x1)g[ix(x+1,y)]=0}else if(y+1<=y1)g[ix(x,y+1)]=0}}}
+    else{for(let y=4;y<GH-2;y+=4){for(let x=1;x<GW-1;x++)g[ix(x,y)]=1;const gaps=2+Math.floor(r()*2);for(let q=0;q<gaps;q++){const x=1+Math.floor(r()*(GW-3));g[ix(x,y)]=0;g[ix(x+1,y)]=0}}
+      for(let i=0;i<10;i++){const x=2+Math.floor(r()*(GW-4)),y=2+Math.floor(r()*(GH-4));if(y%4&&!safe(x,y))g[ix(x,y)]=1}}
+    return g}
+  function gen2(g,r,seed){const ix=(x,y)=>y*GW+x;const cells=[];for(let y=1;y<GH-1;y++)for(let x=1;x<GW-1;x++)if(!g[ix(x,y)]&&x+y>6&&(GW-1-x)+(GH-1-y)>6&&(x%2===1||y%2===1))cells.push([x,y]);shuffle(cells,r);
+    const pick=[];for(const c of cells){if(pick.every(q=>Math.abs(q[0]-c[0])+Math.abs(q[1]-c[1])>=3))pick.push(c);if(pick.length>=16)break}while(pick.length<16)pick.push(cells[pick.length%cells.length]);
+    const KS=['acorn','ghost','acorn','ice'],tn=pick.slice(12,16).map(([x,y])=>({x:(x+.5)*T,y:(y+.5)*T}));
+    const prot=new Set(pick.map(([x,y])=>ix(x,y)));for(let y=0;y<=3;y++)for(let x=0;x<=3;x++){prot.add(ix(x,y));prot.add(ix(GW-1-x,GH-1-y))}
+    const rs=mulberry32(seed^0x5e1f7),shifts=[],cur=g.slice();
+    [15,30].forEach(tt=>{for(let tries=0;tries<40;tries++){const cl=[],op=[],nb=(x,y)=>DIRS.reduce((n,[dx,dy])=>n+(cur[ix(x+dx,y+dy)]?0:1),0);
+        for(let k=0;k<200&&(cl.length<6||op.length<6);k++){const x=1+Math.floor(rs()*(GW-2)),y=1+Math.floor(rs()*(GH-2)),i=ix(x,y);if(prot.has(i)||cl.includes(i)||op.includes(i))continue;
+          if(!cur[i]&&cl.length<6&&nb(x,y)>=2)cl.push(i);else if(cur[i]&&op.length<6&&nb(x,y)>=2)op.push(i)}
+        const nx=cur.slice();cl.forEach(i=>nx[i]=1);op.forEach(i=>nx[i]=0);if(conn({g:nx})){cur.set(nx);shifts.push({t:tt,cl,op});break}}});
+    return{w:GW,h:GH,g,acorns:pick.slice(0,12).map(([x,y],i)=>({x:(x+.5)*T,y:(y+.5)*T,t:2.5+i*3.1,k:KS[i%4]})),tun:[[tn[0],tn[1]],[tn[2],tn[3]]],shifts}}
+  const TMAPS=[{n:'이불 미로',d:'꼬불꼬불 이불 길'},{n:'장난감 광장',d:'넓은 바닥에 장난감이 와르르'},{n:'베개 성',d:'베개 성벽이 겹겹이, 문은 몇 개뿐'},{n:'빨래 건조대',d:'긴 빨래 줄 사이로 달리기'}];
   function pickup(a,who){if(a.k==='acorn')return'acorn';return a.k}
   function tunnel(p,st,who){if(st.wcd>0)return;for(const [a,b] of s.mz.tun){for(const [u,v] of [[a,b],[b,a]]){if(hyp(p.x-u.x,p.y-u.y)<14){p.x=v.x;p.y=v.y;p.kx=p.ky=0;st.wcd=1.4;ring(v.x,v.y,'#b79cff',60);if(who==='me'){beep(520,.08,'sine',.05);beep(780,.12,'sine',.05)}bubble(who,'슝!',.8);if(p===s.op&&!s.bot){}return}}}}
   const amTag=()=>((s.first+s.tagN)%2)===s.o.me;
@@ -420,14 +439,16 @@ const TagG=(()=>{
     const el=(now-s.t0)/1000;s.mz.acorns.forEach((a,i)=>{if(s.got.has(i)||el<a.t)return;if(hyp(a.x-b.x,a.y-b.y)<PR+11){s.got.add(i);if(a.k==='acorn')bt.boost=3;else if(a.k==='ghost'){bt.ghost=3;bubble('op','이불 뒤집어쓰기!',1)}else{s.iced=1.6;bubble('me','얼음!',1.2);bubble('op','얼어라!',1);beep(1200,.2,'sine',.05)}}})}
   return{
     id:'tag',name:'이불 술래잡기',btn:'멍!',stat:'run',stick:true,
-    rules:['술래가 상대에게 코를 맞대면(코츄) 술래가 넘어가요. 40초 동안 술래였던 시간이 짧은 쪽이 이겨요. (끝날 때 술래면 +5초 벌칙)','아이템: 🌰 도토리 3초 빨라짐 · 👻 이불 뒤집어쓰기 4초 동안 상대 화면에서 거의 안 보임 · ❄️ 상대 1.6초 얼음','보라색 이불 터널에 들어가면 짝 터널로 슝! 이동해요. 멍!은 상대를 밀쳐내요.'],
+    rules:['술래가 상대에게 코를 맞대면(코츄) 술래가 넘어가요. 40초 동안 술래였던 시간이 짧은 쪽이 이겨요. (끝날 때 술래면 +5초 벌칙) 맵 4종: 이불 미로 · 장난감 광장 · 베개 성 · 빨래 건조대','15초·30초에 형이 이불을 정리해서 길이 바뀌어요(빨간 칸은 막히고 초록 칸은 열려요). 아이템: 🌰 3초 빨라짐 · 👻 3초 거의 안 보임 · ❄️ 상대 1.6초 얼음','보라색 이불 터널에 들어가면 짝 터널로 슝! 이동해요. 멍!은 상대를 밀쳐내요.'],
     init(o){const mz=gen(o.seed),a=[1.5*T,1.5*T],z=[(GW-1.5)*T,(GH-1.5)*T],mi=o.me?z:a,th=o.me?a:z;
-      s={o,mz,t0:o.now,first:(o.seed>>>3)&1,tagN:0,freeze:0,tt:0,ott:0,boost:0,stun:0,cdB:0,ghost:0,iced:0,wcd:0,opGhost:0,got:new Set(),ended:false,endAt:0,d:derive(o.myC),od:derive(o.oppC),
+      s={o,mz,shDone:{},shWarn:{},t0:o.now,first:(o.seed>>>3)&1,tagN:0,freeze:0,tt:0,ott:0,boost:0,stun:0,cdB:0,ghost:0,iced:0,wcd:0,opGhost:0,got:new Set(),ended:false,endAt:0,d:derive(o.myC),od:derive(o.oppC),
         me:{x:mi[0],y:mi[1]},op:{x:th[0],y:th[1],ok:o.bot},bot:o.bot?{freeze:0,stun:0,boost:0,cdB:0,dm:null,dT:0,nav:{},tt:0}:null};
-      bigText(amTag()?'첫 술래는 나!':'첫 술래는 '+opName()+'!',true,1500,amTag())},
+      bigText(TMAPS[mz.kind].n+' · '+(amTag()?'첫 술래는 나!':'첫 술래는 '+opName()+'!'),true,1700,amTag())},
     step(dt,now,inp){const el=now-s.t0;
       if(!s.ended&&el>=ROUND){s.ended=true;s.endAt=now;bigText('끝!',false,900);beep(220,.4,'triangle',.07)}
       if(s.ended)return;
+      const elS=el/1000;s.mz.shifts.forEach((sh,i)=>{if(!s.shDone[i]&&elS>=sh.t){s.shDone[i]=1;sh.cl.forEach(k=>s.mz.g[k]=1);sh.op.forEach(k=>s.mz.g[k]=0);bigText('형이 이불을 정리했어요! 길이 바뀜',true,1300);C.shake=.3;beep(200,.25,'triangle',.06);if(s.bot)s.bot.dm=null}
+        if(!s.shWarn[i]&&elS>=sh.t-2&&elS<sh.t){s.shWarn[i]=1;bubble('me','형이 뒤척… 이불이 움직여요!',1.2)}});
       s.freeze=Math.max(0,s.freeze-dt);s.boost=Math.max(0,s.boost-dt);s.stun=Math.max(0,s.stun-dt);s.cdB=Math.max(0,s.cdB-dt);s.ghost=Math.max(0,s.ghost-dt);s.iced=Math.max(0,s.iced-dt);s.wcd=Math.max(0,s.wcd-dt);
       const tag=amTag();if(tag)s.tt+=dt;let mul=1;if(s.boost>0)mul*=BOOST;if(s.stun>0)mul*=.3;if(tag)mul*=TMUL;if(tag&&s.freeze>0)mul=0;if(s.iced>0)mul=0;
       const m=s.me;walk(m,inp,s.d.speed*mul,dt);gResolve(s.mz,m,T);tunnel(m,s,'me');
@@ -449,8 +470,16 @@ const TagG=(()=>{
     draw(now){const t=now/1000,z=clamp(Math.min(W,H)/(8*T),.8,1.7),wW=GW*T,wH=GH*T,vw=W/z,vh=H/z;
       const cx=vw>=wW?wW/2:clamp(s.me.x,vw/2,wW-vw/2),cy=vh>=wH?wH/2:clamp(s.me.y,vh/2,wH-vh/2),sh=C.shake*32;
       screen();ctx.fillStyle='#120f24';ctx.fillRect(0,0,W,H);const toS=cam(cx,cy,z,(Math.random()-.5)*sh,(Math.random()-.5)*sh);
+      const TK=s.mz.kind,TOY=['#ff8a68','#7ec6ff','#ffd59a','#8fe08a','#d59aff'];
       drawGrid(s.mz,T,cx,cy,z,(x0,x1,y0,y1)=>{const dp=pat(QUILT);for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(s.mz.g[y*GW+x]!==1)continue;
-        ctx.fillStyle=dp;ctx.fillRect(x*T,y*T,T,T);if(y+1<GH&&!s.mz.g[(y+1)*GW+x]){ctx.fillStyle='rgba(5,5,15,.5)';ctx.fillRect(x*T,y*T+T-8,T,8)}if(y>0&&!s.mz.g[(y-1)*GW+x]){ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x*T,y*T,T,3)}}});
+        const edge=x===0||y===0||x===GW-1||y===GH-1;
+        if(TK===0||edge){ctx.fillStyle=dp;ctx.fillRect(x*T,y*T,T,T)}
+        else if(TK===1){ctx.fillStyle='rgba(0,0,0,.3)';rr(x*T+3,y*T+6,T-6,T-6,6);ctx.fill();ctx.fillStyle=TOY[(x*7+y*3)%5];rr(x*T+3,y*T+2,T-6,T-8,6);ctx.fill();ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.arc(x*T+T/2-6,y*T+T/2-6,4,0,7);ctx.arc(x*T+T/2+6,y*T+T/2-6,4,0,7);ctx.fill()}
+        else if(TK===2){ctx.fillStyle='#eae4f4';rr(x*T+1,y*T+1,T-2,T-2,12);ctx.fill();ctx.strokeStyle='rgba(150,140,190,.5)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x*T+8,y*T+T/2);ctx.lineTo(x*T+T-8,y*T+T/2);ctx.stroke()}
+        else{ctx.fillStyle='#6d5a48';ctx.fillRect(x*T,y*T+T/2-2,T,4);ctx.fillStyle=TOY[(x+y)%5];ctx.beginPath();ctx.moveTo(x*T+6,y*T+T/2);ctx.lineTo(x*T+T-6,y*T+T/2);ctx.lineTo(x*T+T-10,y*T+T-4);ctx.lineTo(x*T+10,y*T+T-4);ctx.fill()}
+        if(TK!==0&&!edge)continue;if(y+1<GH&&!s.mz.g[(y+1)*GW+x]){ctx.fillStyle='rgba(5,5,15,.5)';ctx.fillRect(x*T,y*T+T-8,T,8)}if(y>0&&!s.mz.g[(y-1)*GW+x]){ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x*T,y*T,T,3)}}});
+      {const elS=(now-s.t0)/1000;s.mz.shifts.forEach(sh=>{if(elS<sh.t-2||elS>=sh.t)return;const pk=.5+.5*Math.sin(t*14);sh.cl.forEach(k=>{const x=k%GW,y=Math.floor(k/GW);ctx.strokeStyle='rgba(255,90,95,'+pk.toFixed(2)+')';ctx.lineWidth=3;ctx.strokeRect(x*T+3,y*T+3,T-6,T-6);ctx.fillStyle='rgba(255,90,95,'+(pk*.25).toFixed(2)+')';ctx.fillRect(x*T+3,y*T+3,T-6,T-6)});
+        sh.op.forEach(k=>{const x=k%GW,y=Math.floor(k/GW);ctx.strokeStyle='rgba(143,224,138,'+pk.toFixed(2)+')';ctx.setLineDash([5,4]);ctx.lineWidth=3;ctx.strokeRect(x*T+3,y*T+3,T-6,T-6);ctx.setLineDash([])})})}
       s.mz.tun.forEach((pr,pi)=>pr.forEach(u=>{const c=pi?'#ff9ad5':'#b79cff';ctx.fillStyle='rgba(0,0,0,.5)';ctx.beginPath();ctx.ellipse(u.x,u.y,17,12,0,0,7);ctx.fill();ctx.strokeStyle=c;ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(u.x,u.y,17+Math.sin(t*4)*2,12+Math.sin(t*4)*1.5,0,0,7);ctx.stroke();
         ctx.save();ctx.translate(u.x,u.y);ctx.rotate(t*2);ctx.strokeStyle=c;ctx.globalAlpha=.6;ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,7,0,4);ctx.stroke();ctx.restore()}));
       const el=(now-s.t0)/1000;s.mz.acorns.forEach((a,i)=>{if(s.got.has(i)||el<a.t)return;const k=Math.min(1,(el-a.t)*3);if(a.k==='acorn')drawAcorn(a.x,a.y,t,k);else{ctx.save();ctx.globalAlpha=k;ctx.fillStyle=a.k==='ice'?'rgba(150,210,255,.3)':'rgba(220,210,255,.3)';ctx.beginPath();ctx.arc(a.x,a.y,15,0,7);ctx.fill();ctx.font='20px sans-serif';ctx.textAlign='center';ctx.fillText(a.k==='ice'?'❄️':'👻',a.x,a.y+7+Math.sin(t*3+i)*2);ctx.restore()}});
@@ -461,6 +490,7 @@ const TagG=(()=>{
       const [px,py]=toS(s.me.x,s.me.y);vignette(px,py,3.4*T*z);
       if(!it&&s.op.ok&&!s.ended){const dd=hyp(s.op.x-s.me.x,s.op.y-s.me.y);if(dd<5*T){const a=(1-dd/(5*T))*(.35+.15*Math.sin(t*10));const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.35,W/2,H/2,Math.max(W,H)*.75);g.addColorStop(0,'rgba(255,90,95,0)');g.addColorStop(1,'rgba(255,90,95,'+a.toFixed(3)+')');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}}
       if(s.op.ok&&!opG){const [qx,qy]=toS(s.op.x,s.op.y);drawPointer(qx,qy,s.o.oppC,!it?'#ff5a5f':'#7ec6ff',t)}
+      ctx.font='13px Jua, sans-serif';ctx.textAlign='left';ctx.fillStyle='rgba(246,236,220,.75)';ctx.fillText('맵 · '+TMAPS[s.mz.kind].n,16,H-26);ctx.textAlign='center';
       if(s.ghost>0||s.iced>0){ctx.font='15px Jua, sans-serif';ctx.textAlign='center';ctx.fillStyle=s.iced>0?'#bfe6ff':'#e6dcff';ctx.fillText(s.iced>0?'❄️ 얼음! '+s.iced.toFixed(1):'👻 투명 '+Math.ceil(s.ghost)+'초',W/2,H-130)}}
   }})();
 
@@ -477,26 +507,29 @@ const PillowG=(()=>{
   function hitBy(p,Q,e,who){p.vx+=num(e.dx)*clamp(num(e.v),0,900)*Q.res;p.vy+=num(e.dy)*clamp(num(e.v),0,900)*Q.res;bubble(who,'퍽!',.8);ring(p.x,p.y,'#f6ecdc',60);if(who==='me'){C.shake=.25;beep(160,.15,'square',.06)}}
   function swing(a,A,b,who,now){a.sw=now;const dx=b.x-a.x,dy=b.y-a.y,d=hyp(dx,dy)||1;a.vx+=dx/d*150;a.vy+=dy/d*150;beep(420,.1,'triangle',.05);
     return d<HITR&&!b.out?{k:'hit',dx:Math.round(dx/d*1000)/1000,dy:Math.round(dy/d*1000)/1000,v:Math.round(A.hitV)}:null}
+  function kingPlan(seed){const r=mulberry32(seed^0x6b1d),a=[];[5.5,12,18.5].forEach(t0=>{const ang=r()*6.28,rad=40+r()*60;a.push({t:t0+r()*1.5,x:Math.cos(ang)*rad,y:Math.sin(ang)*rad})});return a}
+  function kingPick(p,who,now){const el=(now-s.t0)/1000;s.kp.forEach((k,i)=>{if(s.kg.has(i)||el<k.t||p.out)return;if(hyp(p.x-k.x,p.y-k.y)<PR+18){s.kg.add(i);p.big=true;bubble(who,'왕베개 획득!',1.2);ring(k.x,k.y,'#ffd59a',70);if(who==='me'){beep(990,.15,'triangle',.06);bigText('왕베개! 다음 한 방 3배',true,1000)}}})}
   return{
     id:'pillow',name:'밤 베개 싸움',btn:'베개!',stat:'pow',stick:true,
-    rules:['이불 밖으로 먼저 떨어지는 쪽이 져요.','이불이 점점 작아져요.','베개!로 가까운 상대를 세게 쳐요. 힘이 셀수록 멀리 날아가요.'],
-    init(o){const a=o.me?1:-1;s={o,t0:o.now,P:par(o.myC),Q:par(o.oppC),me:{x:a*75,y:0,vx:0,vy:0,out:0},op:{x:-a*75,y:0,vx:0,vy:0,out:0,ok:o.bot},cd:0,sw:0,ended:false,endAt:0,bot:o.bot?{cd:1.6}:null}},
+    rules:['이불 밖으로 먼저 떨어지는 쪽이 져요. 이불이 점점 작아져요.','베개!로 가까운 상대를 세게 쳐요. 힘이 셀수록 멀리 날아가요.','가끔 👑 왕베개가 떨어져요. 먹으면 다음 한 방이 3배로 날아가요!'],
+    init(o){const a=o.me?1:-1;s={o,t0:o.now,kp:kingPlan(o.seed),kg:new Set(),P:par(o.myC),Q:par(o.oppC),me:{x:a*75,y:0,vx:0,vy:0,out:0},op:{x:-a*75,y:0,vx:0,vy:0,out:0,ok:o.bot},cd:0,sw:0,ended:false,endAt:0,bot:o.bot?{cd:1.6}:null}},
     step(dt,now,inp){const el=(now-s.t0)/1000,m=s.me,op=s.op;
       if(!s.ended&&(m.out||op.out||el>TMAX)){s.ended=true;s.endAt=now;if(el>TMAX&&!m.out&&!op.out)bigText('시간 끝!',true,900)}
       s.cd=Math.max(0,s.cd-dt);
       if(!m.out&&!s.ended){body(m,inp.mx*inp.mag*s.P.acc,inp.my*inp.mag*s.P.acc,dt,s.P);if(op.ok&&!op.out)collide(m,s.P,op,s.Q);fallCheck(m,'me',now);
-        if(inp.pressed&&s.cd<=0){s.cd=s.P.cd;s.sw++;bubble('me','베개!',.6);const e=swing(m,s.P,op,'me',now);if(e)sendEv(e)}}
+        kingPick(m,'me',now);
+        if(inp.pressed&&s.cd<=0){s.cd=s.P.cd;s.sw++;const big=m.big;bubble('me',big?'왕베개 펀치!':'베개!',.8);const e=swing(m,s.P,op,'me',now);if(big){m.big=false;C.shake=.3;ring(m.x,m.y,'#ffd59a',120)}if(e){if(big)e.v*=3;if(s.o.bot)hitBy(op,s.Q,e,'op');else sendEv(e)}}}
       if(s.bot){const b=op,bt=s.bot;bt.cd=Math.max(0,bt.cd-dt);
         if(!b.out&&!s.ended){const r=R(now),dx=m.x-b.x,dy=m.y-b.y,dO=hyp(dx,dy)||1,dc=hyp(b.x,b.y)||1,edge=dc/r;
           let ax=dx/dO*(1-edge*.5),ay=dy/dO*(1-edge*.5);if(edge>.55){ax+=-b.x/dc*(edge-.55)*3;ay+=-b.y/dc*(edge-.55)*3}const l=hyp(ax,ay)||1;
           body(b,ax/l*s.Q.acc*.7,ay/l*s.Q.acc*.7,dt,s.Q);if(!m.out)collide(b,s.Q,m,s.P);fallCheck(b,'op',now);
-          if(dO<HITR-8&&bt.cd<=0&&!m.out&&Math.random()<dt*1.8){bt.cd=s.Q.cd;bubble('op','베개!',.6);const e=swing(b,s.Q,m,'op',now);if(e)hitBy(m,s.P,e,'me')}}
+          kingPick(b,'op',now);if(dO<HITR-8&&bt.cd<=0&&!m.out&&Math.random()<dt*1.8){bt.cd=s.Q.cd;const big=b.big;bubble('op',big?'왕베개 펀치!':'베개!',.8);const e=swing(b,s.Q,m,'op',now);if(big){b.big=false;ring(b.x,b.y,'#ffd59a',120)}if(e){if(big)e.v*=3;hitBy(m,s.P,e,'me')}}}
       }else if(!op.out){smooth(op,dt,14)}},
-    onRemote(g){remoteTo(s.op,g,-600,-600,600,600);s.op.vx=num(g.vx);s.op.vy=num(g.vy);if(num(g.out)>0&&!s.op.out){s.op.out=num(g.out);s.op.fall=performance.now();bubble('op','으앗!',1)}
+    onRemote(g){remoteTo(s.op,g,-600,-600,600,600);s.op.vx=num(g.vx);s.op.vy=num(g.vy);if(Array.isArray(g.kg))g.kg.forEach(i=>{if(Number.isInteger(i)&&i>=0&&i<3)s.kg.add(i)});s.op.big=!!g.bg;if(num(g.out)>0&&!s.op.out){s.op.out=num(g.out);s.op.fall=performance.now();bubble('op','으앗!',1)}
       if(Number.isInteger(g.sw)&&g.sw!==s.op.swn){if(s.op.swn!=null)s.op.sw=performance.now();s.op.swn=g.sw}},
     onEv(e){if(e.k==='hit'&&!s.me.out)hitBy(s.me,s.P,e,'me')},
-    botHear(e){if(e.k==='hit'&&!s.op.out)hitBy(s.op,s.Q,e,'op')},
-    state(){const m=s.me;return{x:Math.round(m.x),y:Math.round(m.y),vx:Math.round(m.vx),vy:Math.round(m.vy),out:m.out,sw:s.sw}},
+    botHear(e){},
+    state(){const m=s.me;return{x:Math.round(m.x),y:Math.round(m.y),vx:Math.round(m.vx),vy:Math.round(m.vy),out:m.out,sw:s.sw,kg:Array.from(s.kg),bg:m.big?1:0}},
     result(now){if(!s.ended||now-s.endAt<500)return null;const mo=s.me.out,oo=s.op.out;
       if(mo&&oo)return Math.abs(mo-oo)<.05?'draw':(mo<oo?'opp':'me');if(mo)return'opp';if(oo)return'me';const dm=hyp(s.me.x,s.me.y),dO=hyp(s.op.x,s.op.y);return Math.abs(dm-dO)<6?'draw':(dm<dO?'me':'opp')},
     summary(){const mo=s.me.out,oo=s.op.out;if(mo&&(!oo||mo<oo))return'내가 먼저 이불 밖으로 떨어졌어요.';if(oo)return opName()+'가 먼저 이불 밖으로 떨어졌어요.';return'둘 다 버텨서 이불 가운데에 더 가까운 쪽이 이겼어요.'},
@@ -510,8 +543,10 @@ const PillowG=(()=>{
       ctx.fillStyle='rgba(0,0,0,.45)';ctx.beginPath();ctx.arc(0,8,r+4,0,7);ctx.fill();
       ctx.fillStyle=pat(DOTS);ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();
       ctx.lineWidth=6;ctx.strokeStyle=r<=RMIN+1?'rgba(255,90,95,.7)':'rgba(236,231,220,.55)';ctx.stroke();
+      {const el=(now-s.t0)/1000;s.kp.forEach((k,i)=>{if(s.kg.has(i)||el<k.t)return;const b=Math.sin(t*4+i)*3,a=Math.min(1,(el-k.t)*3);ctx.save();ctx.globalAlpha=a;ctx.translate(k.x,k.y+b);ctx.fillStyle='rgba(255,213,154,.3)';ctx.beginPath();ctx.arc(0,0,30,0,7);ctx.fill();ctx.fillStyle='#fff8ea';rr(-24,-14,48,28,12);ctx.fill();ctx.strokeStyle='#d9b45a';ctx.lineWidth=3;ctx.stroke();ctx.font='18px sans-serif';ctx.textAlign='center';ctx.fillText('👑',0,-14);ctx.restore()})}
       const tok=(p,ci,who,col)=>{if(!p.ok&&who==='op')return;let sc=1,al=1,yo=0;if(p.out){const k=clamp((now-p.fall)/700,0,1);sc=1-.6*k;al=1-.75*k;yo=k*18}
         if(now-(p.sw||0)<260){const k=(now-p.sw)/260,o=who==='me'?s.op:s.me,a=Math.atan2(o.y-p.y,o.x-p.x)-1.2+k*2.4;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(a);ctx.fillStyle='#efe3cf';rr(PR+2,-10,34,20,8);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.2)';ctx.lineWidth=2;ctx.stroke();ctx.restore()}
+        if(p.big&&!p.out){ctx.strokeStyle='rgba(255,213,154,'+(.6+.3*Math.sin(t*10)).toFixed(2)+')';ctx.lineWidth=4;ctx.beginPath();ctx.arc(p.x,p.y,PR+10,0,7);ctx.stroke()}
         drawToken(p.x,p.y+yo,ci,{label:who==='me'?'나':opName(),col,scale:sc,alpha:al,bob:p.bob,tilt:p.tilt});drawBubble(p.x,p.y,C.bub[who],now)};
       if(s.me.y<s.op.y){tok(s.me,s.o.myC,'me');tok(s.op,s.o.oppC,'op',opCol())}else{tok(s.op,s.o.oppC,'op',opCol());tok(s.me,s.o.myC,'me')}
       drawParts();screen()}
@@ -576,7 +611,11 @@ const TowerG=(()=>{
   function newTurn(now){s.mode='swing';s.turnAt=now;s.blowUsed=false;s.blowT=0;s.botBlew=false;s.botBlowAt=900+Math.random()*2200;s.botTarget=null;s.rsx=s.sx;
     if(mine())bigText('내 차례!',true,700);else bigText(opName()+' 차례',true,700)}
   function doDrop(x,now){if(s.mode!=='swing')return;s.mode='fall';s.fall={x,w:s.ws[s.k],own:active(),t:now};beep(500,.08,'triangle',.05)}
-  function land(now){const f=s.fall;s.ps.push({x:f.x,w:f.w,own:f.own});beep(300,.1,'square',.05);const j=collapseAt(s.ps);
+  function land(now){const f=s.fall,top=s.ps[s.ps.length-1],wt=s.wt[s.k];if(wt==='berry'){const d=Math.sign(f.x-top.x)||(s.k%2?1:-1);f.x+=d*16;bubble(f.own===s.o.me?'me':'op','데굴데굴…',.9)}
+    const perfect=!wt&&Math.abs(f.x-top.x)<6;s.ps.push({x:f.x,w:f.w,own:f.own,wt});beep(300,.1,'square',.05);
+    if(perfect){s.streak[f.own]=(s.streak[f.own]||0)+1;s.streak[1-f.own]=0;pop(W/2,H*.3,'완벽!','#ffd59a');if(s.streak[f.own]>=2&&s.k+1<=MAXP){s.streak[f.own]=0;const ty=((s.k*7)%2)?'berry':'squish';s.wt[s.k+1]=ty;if(ty==='squish')s.ws[s.k+1]=Math.max(36,Math.round(s.ws[s.k+1]*.55));
+      bigText((f.own===s.o.me?'완벽 2연속! ':opName()+' 완벽 2연속! ')+(ty==='berry'?'굴러가는 산딸기 발사':'찌그러진 도토리 발사'),true,1500,f.own!==s.o.me)}}else s.streak[f.own]=0;
+    const j=collapseAt(s.ps);
     if(j>=0){s.mode='collapse';s.loser=f.own;s.ended=true;s.endAt=now;s.falling=s.ps.slice(j).map((p,i)=>Object.assign({},p,{y:(j+i)*PH,vx:(Math.random()-.5)*120+(p.x-s.ps[j-1].x)*.8,vy:0,rot:0,vr:(Math.random()-.5)*5}));s.ps=s.ps.slice(0,j);bigText('와르르!',false,1200,true);C.shake=.4;beep(120,.5,'sawtooth',.07)}
     else if(s.ps.length-1>=MAXP){s.mode='done';s.ended=true;s.endAt=now;s.loser=-1;bigText('끝까지 안 무너졌어요!',true,1200)}
     else{s.k++;newTurn(now)}}
@@ -584,8 +623,8 @@ const TowerG=(()=>{
   function blowFx(who){bubble(who,'후~',1);for(let i=0;i<8;i++)P({t:'dust',x:W/2+(Math.random()-.5)*220,y:H*.32+(Math.random()-.5)*60,vx:who==='me'?220:-220,vy:0,life:.5,max:.5,s:5})}
   return{
     id:'tower',name:'도토리 탑 쌓기',btn:'놓기!',stat:null,tap:true,
-    rules:['번갈아 블록을 쌓아요. 탑을 무너뜨린 쪽이 져요.','내 차례엔 놓기!, 상대 차례엔 후~로 한 번 방해할 수 있어요.','7초 안에 안 놓으면 자동으로 떨어져요.'],
-    init(o){const r=mulberry32(o.seed^0x9e3779b9);s={o,t0:o.now,ps:[{x:0,w:BW,own:-1}],ws:[],k:1,starter:(o.seed>>>5)&1,phi:r()*6.28,sx:0,rsx:0,ended:false,loser:-1,endAt:0,falling:[],camY:0,last:o.now};
+    rules:['번갈아 블록을 쌓아요. 탑을 무너뜨린 쪽이 져요. 7초 안에 안 놓으면 자동으로 떨어져요.','내 차례엔 놓기!, 상대 차례엔 후~로 한 번 방해할 수 있어요.','가운데에 딱 맞게 2번 연속 놓으면(완벽!) 상대 다음 블록이 찌그러진 도토리(좁음)나 굴러가는 산딸기(바깥으로 데굴)로 바뀌어요.'],
+    init(o){const r=mulberry32(o.seed^0x9e3779b9);s={o,t0:o.now,ps:[{x:0,w:BW,own:-1}],ws:[],wt:{},streak:[0,0],k:1,starter:(o.seed>>>5)&1,phi:r()*6.28,sx:0,rsx:0,ended:false,loser:-1,endAt:0,falling:[],camY:0,last:o.now};
       for(let i=1;i<=MAXP;i++)s.ws[i]=Math.round(clamp(150-i*3-r()*55,44,150));newTurn(o.now)},
     step(dt,now,inp){
       if(s.mode==='swing'){const my=mine(),local=my||s.o.bot;
@@ -612,14 +651,16 @@ const TowerG=(()=>{
       ctx.fillStyle=pat(WALLP);ctx.globalAlpha=.6;ctx.fillRect(0,0,W,Math.min(H,Y(0)));ctx.globalAlpha=1;
       const lamp=ctx.createRadialGradient(W*.8,60,10,W*.8,60,H*.7);lamp.addColorStop(0,'rgba(255,213,154,.25)');lamp.addColorStop(1,'rgba(255,213,154,0)');ctx.fillStyle=lamp;ctx.fillRect(0,0,W,H);
       const dy=Y(0);if(dy<H+40){ctx.fillStyle='#8a5a30';ctx.fillRect(0,dy,W,24*sc);ctx.fillStyle='#b27c49';ctx.fillRect(0,dy,W,8*sc);ctx.fillStyle='#5e3b1f';ctx.fillRect(0,dy+24*sc,W,H)}
-      const blk=(x,y,w,own,rot)=>{ctx.save();ctx.translate(X(x)+shx,Y(y+PH/2));ctx.rotate(rot||0);const ww=w*sc,hh=PH*sc;
+      const blk=(x,y,w,own,rot,wt)=>{ctx.save();ctx.translate(X(x)+shx,Y(y+PH/2));ctx.rotate(rot||0);const ww=w*sc,hh=PH*sc;
+        if(wt==='squish'){ctx.fillStyle='#b47a3c';ctx.beginPath();ctx.ellipse(0,2*sc,ww/2,hh/2,0,0,7);ctx.fill();ctx.fillStyle='#6b4a2a';ctx.beginPath();ctx.ellipse(0,-hh*.15,ww/2+2,hh*.35,0,Math.PI,0);ctx.fill();ctx.restore();return}
+        if(wt==='berry'){ctx.fillStyle='#e0455a';rr(-ww/2,-hh/2,ww,hh,hh/2);ctx.fill();ctx.fillStyle='#ffe2a0';for(let i=-2;i<=2;i++){ctx.beginPath();ctx.arc(i*ww/6,(i%2)*3*sc,1.6*sc,0,7);ctx.fill()}ctx.fillStyle='#5f9a52';ctx.fillRect(-4*sc,-hh/2-4*sc,8*sc,4*sc);ctx.restore();return}
         ctx.fillStyle=own<0?'#c99a62':(own===s.o.me?'#ff9b7c':'#8ccfff');rr(-ww/2,-hh/2,ww,hh,6*sc);ctx.fill();ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(-ww/2+4,-hh/2+3,ww-8,3*sc);ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(-ww/2+4,hh/2-5*sc,ww-8,3*sc);
         if(own>=0){const ci=own===s.o.me?s.o.myC:s.o.oppC,c=CHARS[ci],r=9*sc;ctx.save();ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.clip();if(c.img&&c.img.complete&&c.img.naturalWidth)ctx.drawImage(c.img,-r,-r,r*2,r*2);else{ctx.fillStyle='#8c8a96';ctx.fillRect(-r,-r,r*2,r*2)}ctx.restore()}
         ctx.restore()};
-      s.ps.forEach((p,i)=>blk(p.x,i*PH,p.w,p.own));s.falling.forEach(f=>blk(f.x,f.y,f.w,f.own,f.rot));
+      s.ps.forEach((p,i)=>blk(p.x,i*PH,p.w,p.own,0,p.wt));s.falling.forEach(f=>blk(f.x,f.y,f.w,f.own,f.rot,f.wt));
       if(s.mode==='swing'||s.mode==='fall'){const own=s.mode==='fall'?s.fall.own:active(),w=s.ws[s.k],hy=topY+130;let x=s.sx,y=hy;
         if(s.mode==='fall'){const k=clamp((now-s.fall.t)/350,0,1);x=s.fall.x;y=hy-(hy-topY)*k*k}
-        ctx.strokeStyle='rgba(246,236,220,.5)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X(x),0);ctx.lineTo(X(x),Y(y+PH));ctx.stroke();blk(x,y,w,own);
+        ctx.strokeStyle='rgba(246,236,220,.5)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X(x),0);ctx.lineTo(X(x),Y(y+PH));ctx.stroke();blk(x,y,w,own,0,s.wt[s.k]);if(s.wt[s.k]&&s.mode==='swing'){ctx.fillStyle='#ffd59a';ctx.font='14px Jua, sans-serif';ctx.textAlign='center';ctx.fillText(s.wt[s.k]==='berry'?'산딸기: 놓으면 바깥쪽으로 데굴!':'찌그러진 도토리: 폭이 좁아요',X(x),Y(y)-14)}
         if(s.mode==='swing'){const k=clamp((now-s.turnAt)/TT,0,1);ctx.fillStyle='rgba(255,255,255,.15)';rr(X(x)-30,Y(y)+8,60,6,3);ctx.fill();ctx.fillStyle=k>.7?'#ff5a5f':'#ffd59a';rr(X(x)-30,Y(y)+8,60*(1-k),6,3);ctx.fill();
           if(s.blowT>0){ctx.strokeStyle='rgba(200,230,255,.6)';ctx.lineWidth=3;for(let i=0;i<4;i++){const yy=Y(y+PH/2)+(i-1.5)*12,xx=((t*600+i*90)%(W+200))-100;ctx.beginPath();ctx.moveTo(xx,yy);ctx.lineTo(xx+60,yy);ctx.stroke()}}}}
       screen();ctx.save();ctx.translate(W/2,Y(topY+130));drawBubble(-60,0,C.bub.me,now);drawBubble(60,0,C.bub.op,now);ctx.restore();
@@ -745,22 +786,27 @@ const SnoreG=(()=>{
   const LEN=1500,WID=320,TMAX=45000,WARN=.9;let s=null;
   function sched(seed){const r=mulberry32(seed^0x5bd1e995),a=[];let t=2.2+r()*1.5;while(t<TMAX/1000){const d=1.5+r()*1.1;a.push({w:t,a:t+WARN,e:t+WARN+d});t+=WARN+d+1.4+r()*2.6}return a}
   const phase=el=>{for(const z of s.sn){if(el>=z.w&&el<z.a)return'warn';if(el>=z.a&&el<z.e)return'snore'}return'calm'};
+  function talkPlan(seed){const r=mulberry32(seed^0x7a1c),a=[];let t=5+r()*2;while(t<TMAX/1000-4){a.push({t,d:r()<.5?-1:1});t+=8+r()*3}return a}
+  const talkAt=el=>{for(const k of s.tk)if(el>=k.t&&el<k.t+3)return k;return null};
+  function talkStep(p,who,dx,el){const k=talkAt(el);if(!k)return;const i=s.tk.indexOf(k);p.tkd=p.tkd||{};if(p.tkd[i]==='done')return;p.tkd[i]=(p.tkd[i]||0)+dx*k.d;
+    if(p.tkd[i]>60){p.tkd[i]='done';p.ky=(p.ky||0)-760;bubble(who,'잠꼬대 보너스! 쭉~',1.2);if(who==='me'){confetti(W/2,H*.5,20);beep(990,.2,'triangle',.07)}}}
   function startle(p,who){p.ky=(p.ky||0)+520;p.st=1;bubble(who,'깜짝!',1);if(who==='me'){C.shake=.3;beep(140,.3,'sawtooth',.07);bigText('깜짝! 뒤로 밀렸어요',true,900,true)}}
   function wake(who,el){s.sn.push({w:el,a:el+.6,e:el+.6+1.8});bubble(who,'멍!',1);if(who==='op')bigText(opName()+'가 형을 깨웠어요!',true,900,true)}
   return{
     id:'snore',name:'형 코골이 피하기',btn:'멍!',stat:'run',stick:true,
-    rules:['형 베개까지 먼저 가면 이겨요.','형이 코를 골 때 움직이면 깜짝 놀라 뒤로 밀려나요. 드르… 소리가 나면 멈추세요.','멍!으로 형을 일부러 깨울 수 있어요. 두 번만 써요.'],
-    init(o){const a=o.me?1:-1;s={o,t0:o.now,sn:sched(o.seed),d:derive(o.myC),od:derive(o.oppC),me:{x:a*70,y:LEN-60,st:0,fin:0},op:{x:-a*70,y:LEN-60,st:0,fin:0,ok:o.bot},wakes:2,ended:false,endAt:0,lastPh:'calm',bot:o.bot?{react:0,wakes:2,stop:false,late:false}:null}},
+    rules:['형 베개까지 먼저 가면 이겨요. 형이 잠꼬대로 "음냐… 왼쪽…" 하면 3초 안에 그쪽으로 움직여요. 성공하면 앞으로 쭉 밀어줘요!','형이 코를 골 때 움직이면 깜짝 놀라 뒤로 밀려나요. 드르… 소리가 나면 멈추세요.','멍!으로 형을 일부러 깨울 수 있어요. 두 번만 써요.'],
+    init(o){const a=o.me?1:-1,tk=talkPlan(o.seed),sn=sched(o.seed).filter(z=>!tk.some(k=>z.w<k.t+3.3&&z.e>k.t-.4));s={o,t0:o.now,sn,tk,lastTk:-1,d:derive(o.myC),od:derive(o.oppC),me:{x:a*70,y:LEN-60,st:0,fin:0},op:{x:-a*70,y:LEN-60,st:0,fin:0,ok:o.bot},wakes:2,ended:false,endAt:0,lastPh:'calm',bot:o.bot?{react:0,wakes:2,stop:false,late:false}:null}},
     step(dt,now,inp){const el=(now-s.t0)/1000,m=s.me,op=s.op,ph=phase(el);
+      {const k=talkAt(el),i=k?s.tk.indexOf(k):-1;if(i!==s.lastTk){s.lastTk=i;if(k){bigText('형 잠꼬대: 음냐… '+(k.d<0?'왼쪽…':'오른쪽…'),true,1300);beep(330,.2,'sine',.05)}}}
       if(ph!==s.lastPh){if(ph==='warn')beep(90,.6,'sawtooth',.03);if(ph==='snore'){beep(70,1,'sawtooth',.06);bigText('드르렁!!',true,700,true)}s.lastPh=ph}
       if(!s.ended&&(m.fin||op.fin||el*1000>=TMAX)){s.ended=true;s.endAt=now}
       if(s.ended)return;m.st=Math.max(0,m.st-dt);
       const ox=m.x,oy=m.y;if(!m.fin){walk(m,inp,s.d.speed*.95*(m.st>0?.2:1),dt);m.x=clamp(m.x,-WID/2+PR,WID/2-PR);m.y=clamp(m.y,30,LEN-30);if(op.ok)sepFrom(m,op);
-        const v=hyp(m.x-ox,m.y-oy)/dt;if(ph==='snore'&&m.st<=0&&v>30&&inp.mag>.15)startle(m,'me');if(m.y<=70){m.fin=Math.max(.01,el);bigText('도착!',false,900);confetti(m.x,m.y,30)}}
+        const v=hyp(m.x-ox,m.y-oy)/dt;if(ph==='snore'&&m.st<=0&&v>30&&inp.mag>.15)startle(m,'me');talkStep(m,'me',m.x-ox,el);if(m.y<=70){m.fin=Math.max(.01,el);bigText('도착!',false,900);confetti(m.x,m.y,30)}}
       if(inp.pressed&&s.wakes>0&&!m.fin){s.wakes--;wake('me',el);sendEv({k:'wake'})}
       if(s.bot){const b=op,bt=s.bot;b.st=Math.max(0,b.st-dt);
         if(!b.fin){if(ph!=='calm'){if(!bt.stop){bt.react+=dt;if(bt.react>(bt.late?.9:.28))bt.stop=true}}else{bt.stop=false;bt.react=0;bt.late=Math.random()<.13}
-          const go=!bt.stop;const bx=b.x,by=b.y;botWalk(b,b.x+Math.sin(el*1.3)*20,go?b.y-200:b.y,s.od.speed*.9*(b.st>0?.2:1)*(go?1:0),dt);b.x=clamp(b.x,-WID/2+PR,WID/2-PR);b.y=clamp(b.y,30,LEN-30);sepFrom(b,m);
+          const go=!bt.stop,tk=talkAt(el);if(tk&&bt.tkI!==s.tk.indexOf(tk)){bt.tkI=s.tk.indexOf(tk);bt.tkGo=Math.random()<.7;bt.tkAt=el+.5+Math.random()*.8}const side=tk&&bt.tkGo&&el>=bt.tkAt;const bx=b.x,by=b.y;botWalk(b,side?b.x+tk.d*120:b.x+Math.sin(el*1.3)*20,go?b.y-200:b.y,s.od.speed*.9*(b.st>0?.2:1)*(go||side?1:0),dt);talkStep(b,'op',b.x-bx,el);b.x=clamp(b.x,-WID/2+PR,WID/2-PR);b.y=clamp(b.y,30,LEN-30);sepFrom(b,m);
           if(ph==='snore'&&b.st<=0&&hyp(b.x-bx,b.y-by)/dt>30)startle(b,'op');if(b.y<=70)b.fin=Math.max(.01,el);
           if(bt.wakes>0&&ph==='calm'&&b.y>m.y+60&&Math.random()<dt*.25){bt.wakes--;wake('op',el)}}}
       else smooth(op,dt)},
@@ -781,6 +827,8 @@ const SnoreG=(()=>{
       const br=ph==='snore'?Math.sin(t*14)*4:Math.sin(t*2)*2;ctx.fillStyle='#4a6fa8';ctx.beginPath();ctx.ellipse(0,-40+br,WID*.38,28+br,0,0,7);ctx.fill();ctx.fillStyle='#f6ecdc';ctx.font='16px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('형',0,-74);
       ctx.fillStyle='rgba(255,213,154,.9)';ctx.font=(ph==='snore'?34:ph==='warn'?20:14)+'px Jua, sans-serif';ctx.fillText(ph==='snore'?'드르렁!!':ph==='warn'?'드르…':'zZ',60+Math.sin(t*3)*6,-120-((t*20)%20));
       ctx.strokeStyle='rgba(143,224,138,.8)';ctx.lineWidth=4;ctx.setLineDash([10,8]);ctx.beginPath();ctx.moveTo(-WID/2,70);ctx.lineTo(WID/2,70);ctx.stroke();ctx.setLineDash([]);
+      {const k=talkAt(el);if(k){const left=1-(el-k.t)/3;ctx.save();ctx.fillStyle='rgba(255,213,154,.15)';ctx.fillRect(k.d<0?-WID/2:0,s.me.y-120,WID/2,240);ctx.fillStyle='rgba(255,213,154,'+(.6+.3*Math.sin(t*10)).toFixed(2)+')';{const ax=k.d*WID/4,ay=s.me.y-60;ctx.beginPath();ctx.moveTo(ax+k.d*40,ay);ctx.lineTo(ax-k.d*10,ay-32);ctx.lineTo(ax-k.d*10,ay-12);ctx.lineTo(ax-k.d*40,ay-12);ctx.lineTo(ax-k.d*40,ay+12);ctx.lineTo(ax-k.d*10,ay+12);ctx.lineTo(ax-k.d*10,ay+32);ctx.closePath();ctx.fill();ctx.font='15px Jua, sans-serif';ctx.textAlign='center';ctx.fillText(k.d<0?'왼쪽으로!':'오른쪽으로!',ax,ay+52)}
+        ctx.fillStyle='#fff3d6';rr(-90,-160,180,34,17);ctx.fill();ctx.fillStyle='#3a2210';ctx.font='15px Jua, sans-serif';ctx.fillText('음냐… '+(k.d<0?'왼쪽…':'오른쪽…'),0,-138);ctx.fillStyle='#ffd59a';ctx.fillRect(-90,-122,180*left,4);ctx.restore()}}
       const tk=(p,ci,who,col)=>{if(!p.ok&&who==='op')return;drawToken(p.x,p.y,ci,{label:who==='me'?'나':opName(),col,bob:p.bob,tilt:p.tilt});drawBubble(p.x,p.y,C.bub[who],now)};
       tk(s.op,s.o.oppC,'op',opCol());tk(s.me,s.o.myC,'me');drawParts();
       screen();if(ph!=='calm'){ctx.fillStyle=ph==='snore'?'rgba(255,90,95,.16)':'rgba(255,213,154,.08)';ctx.fillRect(0,0,W,H)}
@@ -792,42 +840,72 @@ const SnoreG=(()=>{
 /* ================= 게임 7: 누나 가방 들어가기 ================= */
 const BagG=(()=>{
   const AW=560,AH=760,SETMAX=18,MAXS=4,WINS=2,INTRO=2.6,AFTER=2.2;let s=null;
-  const TW={normal:{t:'1세트 · 누나 가방',d:'지퍼 열렸을 때 쏙!'},narrow:{t:'가방이 좁아졌다!!',d:'구멍이 작고 금방 닫혀요'},fancy:{t:'누나가 멋있는 가방을 들었다!!',d:'명품 가방은 엄청 빨리 움직여요'},shake:{t:'누나가 가방을 흔들었다!!',d:'흔들릴 땐 근처에 가면 튕겨요'}};
-  function twistFor(k){if(k===0)return'normal';const r=mulberry32((s.o.seed^0x9e3779b9)+k*101),pool=['shake','narrow','shake','fancy','shake'];const prev=k>1?twistFor(k-1):null;let c;do{c=pool[Math.floor(r()*pool.length)]}while(c===prev&&c!=='shake'&&r()<.9);return c}
-  function setup(k,now){const tw=twistFor(k),r=mulberry32((s.o.seed^0x27d4eb2d)+k*7919),op=[],sh=[];let t=INTRO+1.4+r()*1;
-    const oDur=tw==='narrow'?[.45,.3]:[.7,.45];while(t<SETMAX+2){const o=oDur[0]+r()*oDur[1];op.push([t,t+o]);t+=o+1.2+r()*1.7}
-    if(tw==='shake'){let q=INTRO+1.8+r()*.6;while(q<SETMAX){sh.push([q,q+1.3]);q+=2+r()*1}}else if(tw!=='normal'){let q=INTRO+5+r()*3;while(q<SETMAX){sh.push([q,q+1]);q+=6+r()*3}}
-    const a=s.o.me?1:-1;s.k=k;s.tw=tw;s.ts=now;s.open=op;s.shk=sh;s.ph1=r()*6.28;s.ph2=r()*6.28;s.IN=tw==='narrow'?28:46;s.spd=tw==='fancy'?1.75:1;
+  const BT={
+    shoulder:{t:'누나 숄더백',d:'지퍼가 열렸을 때 쏙!',IN:46,o:[.7,.45],g:[1.2,1.7],spd:1,path:'sine',bg:'#120f24'},
+    eco:{t:'누나 에코백!',d:'입구가 넓은데 크게 휙휙 휘둘러요',IN:64,o:[1,.6],g:[1.3,1.4],spd:1.45,path:'swing',bg:'#14201a'},
+    clutch:{t:'누나 클러치!',d:'입구가 엄청 작아요. 정확히 가운데!',IN:22,o:[.55,.35],g:[1,1.3],spd:.75,path:'sine',bg:'#1f1222'},
+    backpack:{t:'누나 백팩!',d:'입구가 위쪽! 가방 위에서만 들어가요',IN:46,o:[.9,.5],g:[1.1,1.4],spd:.9,path:'sine',bg:'#0f1a26',top:true},
+    shopping:{t:'누나 쇼핑백!',d:'항상 열려 있지만 통통 뛰어다녀요',IN:44,path:'hop',spd:1,bg:'#1e170e'},
+    carrier:{t:'누나 캐리어!',d:'데굴데굴 빠르게 굴러가요. 가끔 활짝!',IN:70,o:[.8,.4],g:[2.2,1.5],spd:1,path:'bounce',bg:'#141626'},
+    luxury:{t:'누나가 멋있는 가방을 들었다!!',d:'명품 가방은 엄청 빨리 움직여요',IN:44,o:[.7,.45],g:[1.2,1.7],spd:1.75,path:'sine',bg:'#1d1708'}};
+  function typeFor(k){if(k===0)return'shoulder';const r=mulberry32((s.o.seed^0x9e3779b9)+k*101),pool=['eco','clutch','backpack','shopping','carrier','luxury'];
+    const used=[];for(let j=1;j<k;j++)used.push(typeFor(j));let c,g=0;do{c=pool[Math.floor(r()*pool.length)]}while(used.includes(c)&&g++<20);return c}
+  function setup(k,now){const ty=typeFor(k),D=BT[ty],r=mulberry32((s.o.seed^0x27d4eb2d)+k*7919),op=[],sh=[];
+    if(D.o){let t=INTRO+1.2+r()*1;while(t<SETMAX+2+INTRO){const o=D.o[0]+r()*D.o[1];op.push([t,t+o]);t+=o+D.g[0]+r()*D.g[1]}}
+    if(k>0){let q=INTRO+4+r()*3;while(q<SETMAX+INTRO){if(r()<.55)sh.push([q,q+1.1]);q+=4.5+r()*2.5}}
+    const hops=[];for(let i=0;i<40;i++)hops.push({x:(r()-.5)*(AW-160),y:(r()-.5)*(AH-260)-30});
+    const a=s.o.me?1:-1;s.k=k;s.ty=ty;s.D=D;s.ts=now;s.open=op;s.shk=sh;s.hops=hops;s.ph1=r()*6.28;s.ph2=r()*6.28;
     s.me=Object.assign(s.me||{},{x:a*190,y:300,st:0,fin:0,kx:0,ky:0});s.op=Object.assign(s.op||{},{x:-a*190,y:300,st:0,fin:0,kx:0,ky:0,tx:null});s.sres=null;s.wasOpen=false;s.wasShk=false;s.bot&&(s.bot.rt=-1);
-    bigText(TW[tw].t,true,2200,tw!=='normal');beep(tw==='normal'?660:440,.25,'triangle',.07)}
+    bigText((k+1)+'세트 · '+D.t,true,2200,k>0);beep(k?440:660,.25,'triangle',.07)}
   const sel=now=>(now-s.ts)/1000-INTRO;
-  const isOpen=e=>s.open.some(([a,b])=>e+INTRO>=a&&e+INTRO<b),isShk=e=>s.shk.some(([a,b])=>e+INTRO>=a&&e+INTRO<b);
-  function bag(e){const w=s.spd,base={x:Math.sin(e*.5*w+s.ph1)*160,y:Math.sin(e*.37*w+s.ph2)*190-40};if(isShk(e)){base.x+=Math.sin(e*55)*14;base.y+=Math.cos(e*47)*8}return base}
-  function press(p,who,e){const b=bag(e),d=hyp(p.x-b.x,p.y-b.y);if(d>s.IN+10)return false;
-    if(isOpen(e)&&!isShk(e)){p.fin=Math.max(.01,e);bubble(who,'쏙!',1.2);if(who==='me'){confetti(b.x,b.y,30);beep(990,.2,'triangle',.07)}return true}
-    knockFrom(p,b.x,b.y,420,1,999);p.st=.8;bubble(who,isShk(e)?'흔들려서 못 들어가!':'지퍼 닫혔어!',1);if(who==='me'){C.shake=.25;beep(150,.2,'square',.06)}return false}
+  const isShk=e=>s.shk.some(([a,b])=>e+INTRO>=a&&e+INTRO<b);
+  const HOP=1.6,hopK=e=>Math.max(0,Math.floor(e/HOP)),hopF=e=>(Math.max(0,e)%HOP)/HOP;
+  function isOpen(e){if(s.D.path==='hop')return e>=0&&hopF(e)>.28;return s.open.some(([a,b])=>e+INTRO>=a&&e+INTRO<b)}
+  const tri=x=>{const f=((x%2)+2)%2;return f<1?f*2-1:3-f*2};
+  function bag(e){const D=s.D,w=D.spd;let p;
+    if(D.path==='hop'){const k=hopK(e),f=hopF(e),A=s.hops[k%40],B=s.hops[(k+1)%40];if(f<.28){const u=f/.28;p={x:A.x+(B.x-A.x)*u,y:A.y+(B.y-A.y)*u-Math.sin(u*Math.PI)*70,air:true}}else p={x:B.x,y:B.y}}
+    else if(D.path==='bounce')p={x:tri(e*.42+s.ph1)*(AW/2-70),y:tri(e*.31+s.ph2)*(AH/2-150)-30};
+    else if(D.path==='swing'){const a=Math.sin(e*.9*w+s.ph1)*1.25;p={x:Math.sin(a)*220,y:-170+Math.cos(a)*220}}
+    else p={x:Math.sin(e*.5*w+s.ph1)*160,y:Math.sin(e*.37*w+s.ph2)*190-40};
+    if(isShk(e)){p.x+=Math.sin(e*55)*14;p.y+=Math.cos(e*47)*8}return p}
+  function canEnter(p,b){if(s.D.top)return p.y<b.y-6;return true}
+  function press(p,who,e){const b=bag(e),d=hyp(p.x-b.x,p.y-b.y);if(d>s.D.IN+10)return false;
+    if(isOpen(e)&&!isShk(e)&&!b.air&&canEnter(p,b)){p.fin=Math.max(.01,e);bubble(who,'쏙!',1.2);if(who==='me'){confetti(b.x,b.y,30);beep(990,.2,'triangle',.07)}return true}
+    knockFrom(p,b.x,b.y,420,1,999);p.st=.8;bubble(who,isShk(e)?'흔들려서 못 들어가!':b.air?'공중이야!':(s.D.top&&!canEnter(p,b))?'위쪽으로 들어가야 해!':'지퍼 닫혔어!',1);if(who==='me'){C.shake=.25;beep(150,.2,'square',.06)}return false}
   function endSet(w,now){if(s.sres)return;s.sres={w,at:now};if(w==='me')s.wm++;else if(w==='op')s.wo++;
     bigText(w==='me'?(s.k+1)+'세트 내가 쏙!':w==='op'?(s.k+1)+'세트 '+opName()+' 쏙!':(s.k+1)+'세트 무승부',true,1600,w==='op')}
   function judge(){const a=s.me.fin,b=s.op.fin;if(a&&b)return Math.abs(a-b)<.03?'none':(a<b?'me':'op');if(a)return'me';if(b)return'op';return'none'}
+  function drawBag(b,t,open,shk){const ty=s.ty;ctx.save();ctx.translate(b.x,b.y);ctx.rotate(shk?Math.sin(t*40)*.18:ty==='swing'?0:0);
+    if(ty==='eco'){ctx.strokeStyle='#d8c9a8';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-34,-26);ctx.quadraticCurveTo(-30,-90,0,-92);ctx.quadraticCurveTo(30,-90,34,-26);ctx.stroke();ctx.fillStyle='#efe2c4';rr(-62,-30,124,78,8);ctx.fill();ctx.fillStyle='#5f9a52';ctx.font='16px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('ECO 🌿',0,24)}
+    else if(ty==='clutch'){ctx.fillStyle='#e58fb0';rr(-40,-18,80,38,10);ctx.fill();ctx.fillStyle='#d26c96';ctx.beginPath();ctx.moveTo(-40,-14);ctx.lineTo(0,10);ctx.lineTo(40,-14);ctx.lineTo(40,-18);ctx.lineTo(-40,-18);ctx.fill();ctx.fillStyle='#ffd59a';ctx.beginPath();ctx.arc(0,8,5,0,7);ctx.fill()}
+    else if(ty==='backpack'){ctx.fillStyle='#4a7fc0';rr(-46,-38,92,86,22);ctx.fill();ctx.fillStyle='#3a679f';rr(-32,6,64,34,10);ctx.fill();ctx.strokeStyle='#2c4f7a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,-38,16,Math.PI,0);ctx.stroke();ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='18px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('▼',0,-48-Math.abs(Math.sin(t*5))*6)}
+    else if(ty==='shopping'){ctx.fillStyle='#c79a5c';ctx.beginPath();ctx.moveTo(-44,-30);ctx.lineTo(44,-30);ctx.lineTo(50,44);ctx.lineTo(-50,44);ctx.fill();ctx.strokeStyle='#7a5532';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,-30,18,Math.PI,0);ctx.stroke();ctx.fillStyle='#fff3d6';ctx.font='13px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('SHOP ♥',0,14)}
+    else if(ty==='carrier'){ctx.fillStyle='#9fb6e6';rr(-50,-44,100,92,12);ctx.fill();ctx.fillStyle='#7f96c8';for(let i=-30;i<=30;i+=20)ctx.fillRect(i-3,-40,6,84);ctx.fillStyle='#333';ctx.beginPath();ctx.arc(-34,52,7,0,7);ctx.arc(34,52,7,0,7);ctx.fill();ctx.strokeStyle='#555';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-14,-44);ctx.lineTo(-14,-62);ctx.lineTo(14,-62);ctx.lineTo(14,-44);ctx.stroke();
+      if(open){ctx.fillStyle='#c9d6f2';ctx.save();ctx.translate(0,-44);ctx.rotate(-.5);rr(-50,-86,100,86,12);ctx.fill();ctx.restore();ctx.fillStyle='#2b1b10';rr(-42,-36,84,74,8);ctx.fill()}}
+    else if(ty==='luxury'){ctx.fillStyle='#1d1b22';rr(-56,-30,112,66,14);ctx.fill();ctx.strokeStyle='#d9b45a';ctx.lineWidth=3;ctx.stroke();ctx.setLineDash([5,4]);ctx.beginPath();ctx.arc(0,-26,36,Math.PI,0);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#d9b45a';ctx.beginPath();ctx.arc(0,14,8,0,7);ctx.fill();for(let i=0;i<3;i++){const a=t*2+i*2.1;ctx.fillStyle='rgba(255,236,160,'+(.5+.5*Math.sin(t*6+i)).toFixed(2)+')';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('✦',Math.cos(a)*64,Math.sin(a)*34)}}
+    else{ctx.fillStyle='#e8b4a0';rr(-54,-30,108,64,22);ctx.fill();ctx.strokeStyle='#b77d68';ctx.lineWidth=6;ctx.beginPath();ctx.arc(0,-26,32,Math.PI,0);ctx.stroke()}
+    if(ty!=='carrier'){const zw=ty==='clutch'?16:ty==='eco'?52:40,zy=ty==='backpack'?-30:ty==='eco'?-24:ty==='clutch'?-14:-8;
+      if(open&&!shk){ctx.fillStyle='#2b1b10';ctx.beginPath();ctx.ellipse(0,zy,zw,ty==='clutch'?6:13,0,0,7);ctx.fill()}
+      else if(ty!=='shopping'){ctx.strokeStyle=ty==='luxury'?'#d9b45a':'#8a5a48';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-zw,zy);ctx.lineTo(zw,zy);ctx.stroke();for(let i=-zw+2;i<=zw-2;i+=6){ctx.beginPath();ctx.moveTo(i,zy-4);ctx.lineTo(i,zy+4);ctx.stroke()}}}
+    ctx.restore()}
   return{
     id:'bag',name:'누나 가방 들어가기',btn:'쏙!',stat:'run',stick:true,
-    rules:['돌아다니는 누나 가방 지퍼가 열렸다 닫혔다 해요. 열렸을 때 가방 위에서 쏙!','3판 2선승! 2세트부터는 랜덤 사건이 터져요: 가방이 좁아지거나, 누나가 멋있는 가방을 들거나, 누나가 가방을 흔들어요.','닫혔을 때나 흔들릴 때 누르면 튕겨 나가요. 서로 밀치기도 돼요.'],
+    rules:['돌아다니는 누나 가방이 열렸을 때 가방 위에서 쏙!을 누르면 들어가요. 3판 2선승!','세트마다 가방이 바뀌어요: 에코백(넓지만 휘둘림) · 클러치(입구 작음) · 백팩(위쪽으로만) · 쇼핑백(통통 뜀) · 캐리어(데굴데굴) · 명품백(빠름)','2세트부터는 누나가 가끔 가방을 흔들어요. 닫혔을 때나 흔들릴 때 누르면 튕겨 나가요. 서로 밀치기도 돼요.'],
     init(o){s={o,d:derive(o.myC),od:derive(o.oppC),wm:0,wo:0,ended:false,endAt:0,me:null,op:null,bot:o.bot?{rt:-1}:null,sw:{}};setup(0,o.now);s.op.ok=o.bot},
     step(dt,now,inp){if(s.ended)return;const e=sel(now),m=s.me,op=s.op;
       if(s.sres){if((now-s.sres.at)/1000>AFTER){if(s.wm>=WINS||s.wo>=WINS||s.k+1>=MAXS){s.ended=true;s.endAt=now;return}setup(s.k+1,now)}return}
       if(e<0){smooth(op,dt);return}
-      const open=isOpen(e),shk=isShk(e);if(open!==s.wasOpen){s.wasOpen=open;if(open)beep(660,.12,'triangle',.05)}if(shk!==s.wasShk){s.wasShk=shk;if(shk){C.shake=.35;beep(120,.3,'sawtooth',.05)}}
-      // 세트 판정: 호스트/봇이 정하고 게스트는 받는다
+      const open=isOpen(e),shk=isShk(e);if(open!==s.wasOpen){s.wasOpen=open;if(open&&s.D.path!=='hop')beep(660,.12,'triangle',.05)}if(shk!==s.wasShk){s.wasShk=shk;if(shk){C.shake=.35;beep(120,.3,'sawtooth',.05);bubble('me','누나가 가방을 흔들었다!',1)}}
       const decider=s.o.bot||s.o.me===0;
       if(decider&&!s.sres){if(m.fin||op.fin){s.fw=s.fw||now;if(now-s.fw>450){const w=judge();s.fw=0;endSet(w,now);if(!s.o.bot)sendEv({k:'bset',n2:s.k,w:w==='me'?s.o.me:w==='op'?1-s.o.me:-1})}}else if(e>=SETMAX){endSet('none',now);if(!s.o.bot)sendEv({k:'bset',n2:s.k,w:-1})}}
       if(!decider&&s.sw[s.k]!=null){const w=s.sw[s.k];endSet(w<0?'none':w===s.o.me?'me':'op',now);return}
       m.st=Math.max(0,m.st-dt);
       if(!m.fin){walk(m,inp,s.d.speed*(m.st>0?.25:1),dt);m.x=clamp(m.x,-AW/2+PR,AW/2-PR);m.y=clamp(m.y,-AH/2+PR,AH/2-PR);if(op.ok&&!op.fin){const dx=m.x-op.x,dy=m.y-op.y,d=hyp(dx,dy);if(d<PR*2&&d>.01){sepFrom(m,op);m.kx=(m.kx||0)+dx/d*60;m.ky=(m.ky||0)+dy/d*60}}
-        if(shk){const b=bag(e);if(hyp(m.x-b.x,m.y-b.y)<s.IN+30&&m.st<=0){knockFrom(m,b.x,b.y,520,1,999);m.st=.6;bubble('me','으앗 흔들려!',.9);C.shake=.2}}
+        if(shk){const b=bag(e);if(hyp(m.x-b.x,m.y-b.y)<s.D.IN+30&&m.st<=0){knockFrom(m,b.x,b.y,520,1,999);m.st=.6;bubble('me','으앗 흔들려!',.9);C.shake=.2}}
         if(inp.pressed&&m.st<=0){if(press(m,'me',e))sendEv({k:'in',t:m.fin,n2:s.k});else if(!m.st)bubble('me','가방이 멀어요',.7)}}
-      if(s.bot){const b=op,bt=s.bot;if(!b.fin){b.st=Math.max(0,b.st-dt);const g=bag(e),sd=shk?{x:g.x+(b.x>g.x?1:-1)*120,y:g.y}:g;botWalk(b,sd.x,sd.y,s.od.speed*.72*(b.st>0?.25:1),dt);sepFrom(b,m);
-        if(shk&&hyp(b.x-g.x,b.y-g.y)<s.IN+30&&b.st<=0){knockFrom(b,g.x,g.y,520,1,999);b.st=.6}
-        const near=hyp(b.x-g.x,b.y-g.y)<s.IN;if(near&&open&&!shk&&b.st<=0){if(bt.rt<0)bt.rt=.35+Math.random()*.45;bt.rt-=dt;if(bt.rt<=0){bt.rt=-1;press(b,'op',e)}}else bt.rt=-1;
+      if(s.bot){const b=op,bt=s.bot;if(!b.fin){b.st=Math.max(0,b.st-dt);const g=bag(e);let tx=g.x,ty=g.y;if(shk)tx=g.x+(b.x>g.x?1:-1)*120;if(s.D.top)ty=g.y-26;botWalk(b,tx,ty,s.od.speed*.72*(b.st>0?.25:1),dt);sepFrom(b,m);
+        if(shk&&hyp(b.x-g.x,b.y-g.y)<s.D.IN+30&&b.st<=0){knockFrom(b,g.x,g.y,520,1,999);b.st=.6}
+        const near=hyp(b.x-g.x,b.y-g.y)<s.D.IN;if(near&&open&&!shk&&!g.air&&canEnter(b,g)&&b.st<=0){if(bt.rt<0)bt.rt=.35+Math.random()*.45;bt.rt-=dt;if(bt.rt<=0){bt.rt=-1;press(b,'op',e)}}else bt.rt=-1;
         if(near&&!open&&b.st<=0&&Math.random()<dt*.3)press(b,'op',e)}}
       else smooth(op,dt)},
     onRemote(g){if(num(g.k2,-1)!==s.k)return;remoteTo(s.op,g,-AW,-AH,AW,AH);if(num(g.fin)>0&&!s.op.fin){s.op.fin=num(g.fin);bubble('op','쏙!',1.2)}},
@@ -838,28 +916,21 @@ const BagG=(()=>{
     result(now){if(!s.ended||now-s.endAt<300)return null;return s.wm===s.wo?'draw':(s.wm>s.wo?'me':'opp')},
     summary(){return'세트 나 '+s.wm+' : '+s.wo+' '+opName()},
     hud(now){const e=sel(now);if(e<0||s.sres)return{t:(s.k+1)+'세트',c:'나 '+s.wm+' : '+s.wo+' '+opName(),cls:'go'};const sec=Math.ceil(Math.max(0,SETMAX-e)),o=isOpen(e),sk=isShk(e);
-      return{t:(s.k+1)+'세트 0:'+String(sec).padStart(2,'0'),low:sec<=5,c:sk?'가방 흔들리는 중!':o?'지퍼 열림! 쏙!':'지퍼 닫힘 · '+s.wm+':'+s.wo,cls:sk?'it':o?'go':'run'}},
+      return{t:(s.k+1)+'세트 0:'+String(sec).padStart(2,'0'),low:sec<=5,c:sk?'가방 흔들리는 중!':o?'열림! 쏙!':'닫힘 · '+s.wm+':'+s.wo,cls:sk?'it':o?'go':'run'}},
     button(){return{label:'쏙!',off:s.me.st>0||!!s.me.fin}},
-    draw(now){const t=now/1000,e=Math.max(0,sel(now)),z=Math.min(W/(AW+40),(H-160)/(AH+40)),sh=C.shake*30,open=sel(now)>=0&&isOpen(e)&&!s.sres,shk=sel(now)>=0&&isShk(e)&&!s.sres,tw=s.tw;
-      screen();const bgc={normal:'#120f24',narrow:'#1a1030',fancy:'#1d1708',shake:'#240f14'}[tw];ctx.fillStyle=bgc;ctx.fillRect(0,0,W,H);cam(0,0,z,(Math.random()-.5)*sh,(Math.random()-.5)*sh+20);
-      ctx.fillStyle=pat(PLANK);rr(-AW/2,-AH/2,AW,AH,24);ctx.fill();ctx.strokeStyle=tw==='fancy'?'#c9a24a':'#2b2643';ctx.lineWidth=10;ctx.stroke();
-      ctx.fillStyle=tw==='fancy'?'rgba(255,215,120,.08)':'rgba(126,198,255,.08)';ctx.beginPath();ctx.ellipse(0,0,AW*.42,AH*.42,0,0,7);ctx.fill();
-      // 세트 점수 도토리
+    draw(now){const t=now/1000,e=Math.max(0,sel(now)),z=Math.min(W/(AW+40),(H-160)/(AH+40)),sh=C.shake*30,live=sel(now)>=0&&!s.sres,open=live&&isOpen(e),shk=live&&isShk(e),D=s.D;
+      screen();ctx.fillStyle=D.bg;ctx.fillRect(0,0,W,H);cam(0,0,z,(Math.random()-.5)*sh,(Math.random()-.5)*sh+20);
+      ctx.fillStyle=pat(PLANK);rr(-AW/2,-AH/2,AW,AH,24);ctx.fill();ctx.strokeStyle=s.ty==='luxury'?'#c9a24a':'#2b2643';ctx.lineWidth=10;ctx.stroke();
+      ctx.fillStyle='rgba(126,198,255,.08)';ctx.beginPath();ctx.ellipse(0,0,AW*.42,AH*.42,0,0,7);ctx.fill();
       for(let i=0;i<WINS;i++){ctx.globalAlpha=i<s.wm?1:.22;ctx.fillStyle='#ff8a68';ctx.beginPath();ctx.arc(-AW/2+30+i*26,-AH/2+30,9,0,7);ctx.fill();ctx.globalAlpha=i<s.wo?1:.22;ctx.fillStyle='#7ec6ff';ctx.beginPath();ctx.arc(AW/2-30-i*26,-AH/2+30,9,0,7);ctx.fill()}ctx.globalAlpha=1;
-      ctx.fillStyle='rgba(246,236,220,.75)';ctx.font='14px Jua, sans-serif';ctx.textAlign='center';ctx.fillText((s.k+1)+'세트 · '+TW[tw].d,0,-AH/2+34);
-      const b=bag(e),sc=tw==='narrow'?.78:tw==='fancy'?.95:1;ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(b.x,b.y+30,56*sc,14,0,0,7);ctx.fill();
-      if(open&&!shk){ctx.strokeStyle='rgba(143,224,138,'+(.5+.4*Math.sin(t*12)).toFixed(2)+')';ctx.lineWidth=5;ctx.beginPath();ctx.arc(b.x,b.y,s.IN+14,0,7);ctx.stroke()}
-      if(shk){ctx.strokeStyle='rgba(255,90,95,'+(.4+.4*Math.sin(t*20)).toFixed(2)+')';ctx.lineWidth=4;ctx.setLineDash([8,6]);ctx.beginPath();ctx.arc(b.x,b.y,s.IN+30,0,7);ctx.stroke();ctx.setLineDash([])}
-      ctx.save();ctx.translate(b.x,b.y);ctx.rotate(shk?Math.sin(t*40)*.18:0);ctx.scale(sc,sc);
-      if(tw==='fancy'){ctx.fillStyle='#1d1b22';rr(-56,-30,112,66,14);ctx.fill();ctx.strokeStyle='#d9b45a';ctx.lineWidth=3;ctx.stroke();ctx.strokeStyle='#d9b45a';ctx.lineWidth=3;ctx.setLineDash([5,4]);ctx.beginPath();ctx.arc(0,-26,36,Math.PI,0);ctx.stroke();ctx.setLineDash([]);
-        ctx.fillStyle='#d9b45a';ctx.beginPath();ctx.arc(0,14,8,0,7);ctx.fill();ctx.fillStyle='#1d1b22';ctx.font='11px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('N',0,18);
-        for(let i=0;i<3;i++){const a=t*2+i*2.1;ctx.fillStyle='rgba(255,236,160,'+(.5+.5*Math.sin(t*6+i)).toFixed(2)+')';ctx.font='14px sans-serif';ctx.fillText('✦',Math.cos(a)*64,Math.sin(a)*34)}}
-      else{ctx.fillStyle=tw==='narrow'?'#d79c8a':'#e8b4a0';rr(-54,-30,108,64,22);ctx.fill();ctx.strokeStyle='#b77d68';ctx.lineWidth=6;ctx.beginPath();ctx.arc(0,-26,32,Math.PI,0);ctx.stroke()}
-      const zw=tw==='narrow'?22:40;if(open&&!shk){ctx.fillStyle='#2b1b10';ctx.beginPath();ctx.ellipse(0,-8,zw,tw==='narrow'?8:13,0,0,7);ctx.fill()}
-      else{ctx.strokeStyle=tw==='fancy'?'#d9b45a':'#8a5a48';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-40,-8);ctx.lineTo(40,-8);ctx.stroke();for(let i=-38;i<=38;i+=6){ctx.beginPath();ctx.moveTo(i,-12);ctx.lineTo(i,-4);ctx.stroke()}}
-      ctx.restore();
-      ctx.fillStyle='rgba(246,236,220,.85)';ctx.font='13px Jua, sans-serif';ctx.textAlign='center';ctx.fillText(tw==='fancy'?'누나 명품 가방':'누나 가방',b.x,b.y+50);if(open&&!shk){ctx.fillStyle='#ffd59a';ctx.fillText('열림!',b.x,b.y+66)}
-      if(shk){ctx.fillStyle='#ff9ea0';ctx.font='16px Jua, sans-serif';ctx.fillText('흔들흔들!',b.x,b.y-50)}
+      ctx.fillStyle='rgba(246,236,220,.8)';ctx.font='14px Jua, sans-serif';ctx.textAlign='center';ctx.fillText((s.k+1)+'세트 · '+D.t.replace(/!+$/,'')+' — '+D.d,0,-AH/2+34);
+      const b=bag(e);ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(b.x,(b.air?b.y+70:b.y)+30,56,14,0,0,7);ctx.fill();
+      if(D.path==='swing'){ctx.strokeStyle='rgba(246,236,220,.25)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,-AH/2+10);ctx.lineTo(b.x,b.y-80);ctx.stroke()}
+      if(open&&!shk&&!b.air){ctx.strokeStyle='rgba(143,224,138,'+(.5+.4*Math.sin(t*12)).toFixed(2)+')';ctx.lineWidth=5;ctx.beginPath();ctx.arc(b.x,b.y,D.IN+14,D.top?Math.PI:0,D.top?Math.PI*2:7);ctx.stroke()}
+      if(shk){ctx.strokeStyle='rgba(255,90,95,'+(.4+.4*Math.sin(t*20)).toFixed(2)+')';ctx.lineWidth=4;ctx.setLineDash([8,6]);ctx.beginPath();ctx.arc(b.x,b.y,D.IN+30,0,7);ctx.stroke();ctx.setLineDash([])}
+      drawBag(b,t,open,shk);
+      ctx.fillStyle='rgba(246,236,220,.85)';ctx.font='13px Jua, sans-serif';ctx.textAlign='center';ctx.fillText(D.t.replace(/!+$/,'').replace('누나가 멋있는 가방을 들었다','누나 명품 가방'),b.x,b.y+64);if(open&&!shk&&!b.air){ctx.fillStyle='#ffd59a';ctx.fillText(D.top?'위에서 쏙!':'열림!',b.x,b.y+80)}
+      if(shk){ctx.fillStyle='#ff9ea0';ctx.font='16px Jua, sans-serif';ctx.fillText('흔들흔들!',b.x,b.y-60)}
       const tk=(p,ci,who,col)=>{if(!p.ok&&who==='op')return;if(p.fin){drawBubble(b.x,b.y,C.bub[who],now);return}drawToken(p.x,p.y,ci,{label:who==='me'?'나':opName(),col,bob:p.bob,tilt:p.tilt,alpha:p.st>0?.6:1});drawBubble(p.x,p.y,C.bub[who],now)};
       tk(s.op,s.o.oppC,'op',opCol());tk(s.me,s.o.myC,'me');drawParts();screen()}
   }})();
@@ -876,29 +947,31 @@ const FireG=(()=>{
   const RAYS=[-Math.PI/2,Math.PI,0,Math.PI*.75,Math.PI*.25];
   function blastBalls(b){const out=[];RAYS.forEach(a=>{for(let k=0;k<4;k++)out.push({t:b.t+WARN+k*.1,x:b.x,y:b.y,vx:Math.cos(a)*250,vy:Math.sin(a)*250,ex:1})});return out}
   const fpos=(f,el)=>[f.x+f.vx*(el-f.t),f.y+f.vy*(el-f.t)];
-  function hitCheck(p,who,el){if(p.out||p.inv>0)return;for(const f of s.fs){if(el<f.t||el>f.t+6)continue;const [x,y]=fpos(f,el);if(hyp(x-p.x,y-p.y)<FR+PR-3){p.hp--;p.inv=1.1;const l=hyp(f.vx,f.vy)||1;p.kx=(p.kx||0)+f.vx/l*300;p.ky=(p.ky||0)+f.vy/l*300;bubble(who,'앗 뜨거!',1);
+  function dropPlan(seed){const r=mulberry32(seed^0x2b0d),a=[];let t=6+r()*2;while(t<TMAX/1000-3){a.push({t,x:(r()-.5)*AW*.75,y:-AH*.1+r()*AH*.5});t+=6.5+r()*3}return a}
+  function dropPick(p,who,el){s.wd.forEach((q,i)=>{if(s.wg.has(i)||el<q.t||el>q.t+7||p.out)return;if(hyp(p.x-q.x,p.y-q.y)<PR+16){s.wg.add(i);p.sh=true;bubble(who,'꼬부기 물방울! 보호막',1.2);ring(q.x,q.y,'#7ec6ff',60);if(who==='me')beep(880,.15,'sine',.06)}})}
+  function hitCheck(p,who,el){if(p.out||p.inv>0)return;for(const f of s.fs){if(el<f.t||el>f.t+6)continue;const [x,y]=fpos(f,el);if(hyp(x-p.x,y-p.y)<FR+PR-3){if(p.sh){p.sh=false;p.inv=.9;bubble(who,'치익! 보호막이 막았다',1);ring(p.x,p.y,'#7ec6ff',50);if(who==='me')beep(600,.2,'sine',.06);return}p.hp--;p.inv=1.1;const l=hyp(f.vx,f.vy)||1;p.kx=(p.kx||0)+f.vx/l*300;p.ky=(p.ky||0)+f.vy/l*300;bubble(who,'앗 뜨거!',1);
       if(who==='me'){C.shake=.3;beep(200,.25,'sawtooth',.06)}if(p.hp<=0){p.out=Math.max(.01,el);if(who==='me')bigText('으앗, 다 탔어요',true,1000,true)}return}}}
   function barked(p,e,res,who){if(knockFrom(p,num(e.x),num(e.y),clamp(num(e.v),0,800),res,BR)){bubble(who,'으악!',1);if(who==='me'){C.shake=.2;beep(180,.2,'sawtooth',.05)}}}
   return{
     id:'fire',name:'파이리 불꽃세례',btn:'멍!',stat:'run',stick:true,
-    rules:['파이리랑 브케인이 불꽃세례 연습 중이에요. 위쪽 두 친구가 쏘는 불꽃을 피하세요.','16초가 지나면 파이리가 불대문자를 써요! 땅에 大 모양이 나타난 자리에서 불이 터져요. 大 모양 줄 위에서 빨리 벗어나요.','하트 3개. 먼저 다 잃으면 져요. 40초 버티면 하트가 많은 쪽이 이겨요.','멍!으로 상대를 불꽃 쪽으로 밀어낼 수 있어요.'],
-    init(o){const a=o.me?1:-1,bl=genB(o.seed),fs=gen(o.seed);bl.forEach(b=>fs.push(...blastBalls(b)));s={o,t0:o.now,fs,bl,exOn:false,d:derive(o.myC),od:derive(o.oppC),me:{x:a*110,y:200,hp:3,inv:0,out:0},op:{x:-a*110,y:200,hp:3,inv:0,out:0,ok:o.bot},cdB:0,ended:false,endAt:0,bot:o.bot?{cdB:1}:null}},
+    rules:['파이리랑 브케인이 불꽃세례 연습 중이에요. 위쪽 두 친구가 쏘는 불꽃을 피하세요.','16초가 지나면 파이리가 불대문자를 써요! 땅에 大 모양이 나타난 자리에서 불이 터져요. 大 모양 줄 위에서 빨리 벗어나요.','하트 3개. 먼저 다 잃으면 져요. 40초 버티면 하트가 많은 쪽이 이겨요. 가끔 💧꼬부기 물방울이 떨어져요. 먹으면 불을 한 번 막아줘요.','멍!으로 상대를 불꽃 쪽으로 밀어낼 수 있어요.'],
+    init(o){const a=o.me?1:-1,bl=genB(o.seed),fs=gen(o.seed);bl.forEach(b=>fs.push(...blastBalls(b)));s={o,t0:o.now,fs,bl,exOn:false,wd:dropPlan(o.seed),wg:new Set(),d:derive(o.myC),od:derive(o.oppC),me:{x:a*110,y:200,hp:3,inv:0,out:0},op:{x:-a*110,y:200,hp:3,inv:0,out:0,ok:o.bot},cdB:0,ended:false,endAt:0,bot:o.bot?{cdB:1}:null}},
     step(dt,now,inp){const el=(now-s.t0)/1000,m=s.me,op=s.op;
       if(!s.ended&&(m.out||op.out||el*1000>=TMAX)){s.ended=true;s.endAt=now}
       if(s.ended)return;s.cdB=Math.max(0,s.cdB-dt);m.inv=Math.max(0,m.inv-dt);
       if(!s.exOn&&el>=EXT){s.exOn=true;bigText('파이리의 불대문자!!',true,1800,true);C.shake=.5;beep(110,.6,'sawtooth',.08);beep(80,.8,'square',.05)}
-      if(!m.out){walk(m,inp,s.d.speed,dt);m.x=clamp(m.x,-AW/2+PR,AW/2-PR);m.y=clamp(m.y,-AH/2+60,AH/2-PR);if(op.ok&&!op.out)sepFrom(m,op);hitCheck(m,'me',el)}
+      if(!m.out){walk(m,inp,s.d.speed,dt);m.x=clamp(m.x,-AW/2+PR,AW/2-PR);m.y=clamp(m.y,-AH/2+60,AH/2-PR);if(op.ok&&!op.out)sepFrom(m,op);dropPick(m,'me',el);hitCheck(m,'me',el)}
       if(inp.pressed&&s.cdB<=0&&!m.out){s.cdB=2.5;bubble('me','멍!',1);ring(m.x,m.y,'#7ec6ff',BR);beep(300,.15,'square',.05);sendEv({k:'bark',x:Math.round(m.x),y:Math.round(m.y),v:Math.round(s.d.barkV)})}
       if(s.bot){const b=op,bt=s.bot;bt.cdB=Math.max(0,bt.cdB-dt);b.inv=Math.max(0,b.inv-dt);
-        if(!b.out){let ax=-b.x*.004,ay=(150-b.y)*.004;for(const q of s.bl){if(el<q.t-.2||el>q.t+WARN+.8)continue;const rx=b.x-q.x,ry=b.y-q.y,d=hyp(rx,ry)||1;const onRay=Math.min(Math.abs(rx),Math.abs(ry))<26||Math.abs(Math.abs(rx)-ry)<26;if(onRay&&d<330){const px=Math.abs(rx)<26?1:0,py=Math.abs(ry)<26?1:0;ax+=(px?Math.sign(rx||1)*1.6:0)+(rx/d)*.4;ay+=(py?Math.sign(ry||1)*1.6:0)+(ry/d)*.4}}for(const f of s.fs){if(el<f.t||el>f.t+5)continue;const [fx,fy]=fpos(f,el),rx=b.x-fx,ry=b.y-fy,d=hyp(rx,ry);if(d>160)continue;
+        if(!b.out){let ax=-b.x*.004,ay=(150-b.y)*.004;if(!b.sh)s.wd.forEach((q,i)=>{if(s.wg.has(i)||el<q.t||el>q.t+7)return;const dx=q.x-b.x,dy=q.y-b.y,dd=hyp(dx,dy)||1;if(dd<260){ax+=dx/dd*1.2;ay+=dy/dd*1.2}});for(const q of s.bl){if(el<q.t-.2||el>q.t+WARN+.8)continue;const rx=b.x-q.x,ry=b.y-q.y,d=hyp(rx,ry)||1;const onRay=Math.min(Math.abs(rx),Math.abs(ry))<26||Math.abs(Math.abs(rx)-ry)<26;if(onRay&&d<330){const px=Math.abs(rx)<26?1:0,py=Math.abs(ry)<26?1:0;ax+=(px?Math.sign(rx||1)*1.6:0)+(rx/d)*.4;ay+=(py?Math.sign(ry||1)*1.6:0)+(ry/d)*.4}}for(const f of s.fs){if(el<f.t||el>f.t+5)continue;const [fx,fy]=fpos(f,el),rx=b.x-fx,ry=b.y-fy,d=hyp(rx,ry);if(d>160)continue;
             const l=hyp(f.vx,f.vy)||1,dot=(-rx*f.vx-ry*f.vy)/l;if(dot>0)continue;const px=-f.vy/l,py=f.vx/l,side=Math.sign(rx*px+ry*py)||1;const w=(160-d)/160*2.2;ax+=px*side*w;ay+=py*side*w}
-          const l=hyp(ax,ay);walk(b,{mx:l?ax/l:0,my:l?ay/l:0,mag:Math.min(1,l*1.5)},s.od.speed*.9,dt);b.x=clamp(b.x,-AW/2+PR,AW/2-PR);b.y=clamp(b.y,-AH/2+60,AH/2-PR);if(!m.out)sepFrom(b,m);hitCheck(b,'op',el);
+          const l=hyp(ax,ay);walk(b,{mx:l?ax/l:0,my:l?ay/l:0,mag:Math.min(1,l*1.5)},s.od.speed*.9,dt);b.x=clamp(b.x,-AW/2+PR,AW/2-PR);b.y=clamp(b.y,-AH/2+60,AH/2-PR);if(!m.out)sepFrom(b,m);dropPick(b,'op',el);hitCheck(b,'op',el);
           if(bt.cdB<=0&&!m.out&&hyp(m.x-b.x,m.y-b.y)<BR*.8&&Math.random()<dt*2){bt.cdB=2.5;bubble('op','멍!',1);ring(b.x,b.y,'#7ec6ff',BR);barked(m,{x:b.x,y:b.y,v:s.od.barkV},s.d.res,'me')}}}
       else if(!op.out)smooth(op,dt)},
-    onRemote(g){remoteTo(s.op,g,-AW,-AH,AW,AH);const hp=clamp(Math.floor(num(g.hp,3)),0,3);if(hp<s.op.hp)bubble('op','앗 뜨거!',1);s.op.hp=hp;if(num(g.out)>0)s.op.out=num(g.out);s.op.inv=g.inv?1:0},
+    onRemote(g){remoteTo(s.op,g,-AW,-AH,AW,AH);if(Array.isArray(g.wg))g.wg.forEach(i=>{if(Number.isInteger(i)&&i>=0&&i<s.wd.length)s.wg.add(i)});s.op.sh=!!g.sh;const hp=clamp(Math.floor(num(g.hp,3)),0,3);if(hp<s.op.hp)bubble('op','앗 뜨거!',1);s.op.hp=hp;if(num(g.out)>0)s.op.out=num(g.out);s.op.inv=g.inv?1:0},
     onEv(e){if(e.k==='bark'){bubble('op','멍!',1);ring(num(e.x),num(e.y),'#7ec6ff',BR);if(!s.ended&&!s.me.out)barked(s.me,e,s.d.res,'me')}},
     botHear(e){if(e.k==='bark'&&!s.op.out)barked(s.op,e,s.od.res,'op')},
-    state(){return{x:Math.round(s.me.x),y:Math.round(s.me.y),hp:s.me.hp,out:s.me.out,inv:s.me.inv>0?1:0}},
+    state(){return{x:Math.round(s.me.x),y:Math.round(s.me.y),hp:s.me.hp,out:s.me.out,inv:s.me.inv>0?1:0,wg:Array.from(s.wg),sh:s.me.sh?1:0}},
     result(now){if(!s.ended||now-s.endAt<600)return null;const a=s.me.out,b=s.op.out;if(a&&b)return Math.abs(a-b)<.05?'draw':(a<b?'opp':'me');if(a)return'opp';if(b)return'me';return s.me.hp===s.op.hp?'draw':(s.me.hp>s.op.hp?'me':'opp')},
     summary(){return'남은 하트 나 '+s.me.hp+'개 · '+opName()+' '+s.op.hp+'개'},
     hud(now){const sec=Math.ceil(Math.max(0,TMAX-(now-s.t0))/1000);return{t:'0:'+String(sec).padStart(2,'0'),low:sec<=5,c:'♥'.repeat(s.me.hp)+'♡'.repeat(3-s.me.hp)+'  vs  '+'♥'.repeat(s.op.hp),cls:'it'}},
@@ -919,7 +992,8 @@ const FireG=(()=>{
       for(const f of s.fs){if(el<f.t||el>f.t+6)continue;const [x,y]=fpos(f,el);if(x<-AW/2-40||x>AW/2+40||y<-AH/2-40||y>AH/2+40)continue;const l=hyp(f.vx,f.vy)||1;
         for(let k=1;k<=3;k++){ctx.fillStyle='rgba(255,140,60,'+(.25/k).toFixed(2)+')';ctx.beginPath();ctx.arc(x-f.vx/l*k*9,y-f.vy/l*k*9,FR-k,0,7);ctx.fill()}
         const g=ctx.createRadialGradient(x,y,2,x,y,FR+4);g.addColorStop(0,'#fff6c8');g.addColorStop(.5,f.ex?'#ff4a2a':'#ffb340');g.addColorStop(1,'rgba(255,90,40,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,FR+4,0,7);ctx.fill()}
-      const tk=(p,ci,who,col)=>{if(!p.ok&&who==='op')return;const blink=p.inv>0&&Math.floor(t*12)%2===0;drawToken(p.x,p.y,ci,{label:who==='me'?'나':opName(),col,bob:p.bob,tilt:p.tilt,alpha:p.out?.3:(blink?.4:1)});
+      s.wd.forEach((q,i)=>{if(s.wg.has(i)||el<q.t||el>q.t+7)return;const fade=el>q.t+5.5?.4+.4*Math.sin(t*16):1,b=Math.sin(t*4+i)*3;ctx.save();ctx.globalAlpha=fade;ctx.fillStyle='rgba(126,198,255,.3)';ctx.beginPath();ctx.arc(q.x,q.y+b,22,0,7);ctx.fill();ctx.fillStyle='#7ec6ff';ctx.beginPath();ctx.moveTo(q.x,q.y+b-16);ctx.quadraticCurveTo(q.x+13,q.y+b+2,q.x,q.y+b+10);ctx.quadraticCurveTo(q.x-13,q.y+b+2,q.x,q.y+b-16);ctx.fill();ctx.fillStyle='rgba(255,255,255,.7)';ctx.beginPath();ctx.arc(q.x-4,q.y+b-2,3,0,7);ctx.fill();ctx.fillStyle='#d6f0ff';ctx.font='11px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('꼬부기 물방울',q.x,q.y+b+26);ctx.restore()});
+      const tk=(p,ci,who,col)=>{if(!p.ok&&who==='op')return;const blink=p.inv>0&&Math.floor(t*12)%2===0;if(p.sh&&!p.out){ctx.strokeStyle='rgba(126,198,255,'+(.6+.3*Math.sin(t*8)).toFixed(2)+')';ctx.lineWidth=4;ctx.beginPath();ctx.arc(p.x,p.y,PR+10,0,7);ctx.stroke()}drawToken(p.x,p.y,ci,{label:who==='me'?'나':opName(),col,bob:p.bob,tilt:p.tilt,alpha:p.out?.3:(blink?.4:1)});
         ctx.fillStyle='#ff8a8a';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('♥'.repeat(Math.max(0,p.hp)),p.x,p.y+PR+16);drawBubble(p.x,p.y,C.bub[who],now)};
       tk(s.op,s.o.oppC,'op',opCol());tk(s.me,s.o.myC,'me');drawParts();screen()}
   }})();
@@ -1041,7 +1115,6 @@ const QUIZ=[
 ['브케인의 등 불꽃은 기분이 좋으면 꺼진다.',0,'기분 좋을 땐 더 커지고, 파이리한테 칭찬받으면 최대로 타올라요.','lore'],
 ['사랑이가 형 목 위에서 자는 건 형 코골이가 진동 마사지 같아서다.',1,'사랑이는 그걸 형 안마기라고 불러요.','lore'],
 ['망덩이 산딸기 농장의 직원은 미소와 시오다.',0,'직원은 이브이 한 명이에요. 월급은 산딸기 3알이고, 이브이는 그중 1알을 사랑이 도토리랑 바꿔 먹어요.','lore'],
-['애들이 누나 독일어 공부를 보다 만든 말 쿠츠는 코츄를 뜻한다.',1,'진짜 독일어는 아니고 애들끼리 만든 말이에요. 누나 앞에서만 써요.','lore'],
 ['일본 여행 때 미뇽은 오호리 공원 연못에 빠질 뻔했다.',1,'갈매기를 따라가다가 누나가 꼬리를 잡아줘서 살았대요.','lore'],
 ['세가락 갈매기가 축복을 주는 건 망덩이 산딸기를 얻어먹어서다.',0,'이브이가 일본에서 나눠준 과자 부스러기 때문이에요. 그 갈매기는 아직도 이브이를 기억해요.','lore'],
 ['똘망이는 옷을 벗으면 말끝마다 똘을 붙인다.',1,'배고프똘, 코츄하똘. 본인은 모른대요.','lore'],
@@ -1070,8 +1143,8 @@ const QUIZ=[
 ['파이리의 꼬리 불꽃은 형이 웃을 때 같이 커진다.',1,'그래서 브케인은 파이리 연습 전에 형을 웃기려고 애써요.','lore'],
 ['브케인은 파이리를 사부님이라고 부른다.',1,'파이리는 그 호칭이 부끄러워서 대장이라고 부르라고 했는데 안 바꿔요.','lore'],
 ['인형들 사이에서 가장 높은 계급은 대표 강아지가 아니라 누나다.',1,'누나는 명예 회장이에요. 애들이 투표 없이 만장일치로 정했대요.','lore'],
-['사랑이와 망덩이는 처음 만난 날 바로 코츄를 했다.',0,'처음엔 서로 엉덩이 냄새부터 맡았고, 코츄는 사흘 뒤에 했어요. 그날이 코츄의 기원이에요.','lore'],
-['코츄라는 이름을 처음 지은 건 미소다.',0,'이브이가 코 쭈! 하고 부딪힌 소리를 따라 하다가 생긴 말이에요.','lore'],
+['사랑이와 망덩이는 처음 만난 날 바로 코츄를 했다.',0,'처음엔 서로 엉덩이 냄새부터 맡았어요. 사흘 뒤 사랑이가 망덩이 코에 처음으로 코를 콕 맞댔고, 그게 세상 첫 코츄예요.','lore'],
+['코츄를 처음 만든 건 미소다.',0,'코츄는 사랑이가 처음 만들었어요. 코를 콕 맞대고 코츄!라고 이름까지 붙인 원조가 사랑이예요.','lore'],
 ['망덩이 산딸기 농장에는 비밀 지하 창고가 있다.',1,'형 신발장 밑 공간이에요. 겨울용 말린 산딸기가 숨겨져 있어요.','lore'],
 ['애들이 매년 여는 코츄 대회의 우승 상품은 산딸기 한 바구니다.',0,'우승 상품은 형 베개 위에서 하룻밤 자기 권리예요. 1년 내내 다들 노려요.','lore'],
 ['일본 여행 때 사랑이는 누나 가방에서 한 번도 안 나왔다.',0,'편의점 앞에서 몰래 나왔다가 누나가 다시 넣어줬어요. 그때 본 오니기리를 아직도 꿈꿔요.','lore'],
@@ -1126,7 +1199,207 @@ const QUIZ=[
 ['코츄단은 다음 여행지로 달나라를 정했다.',1,'로켓 대신 미소·시오를 타고 가겠대요. 출발 신호는 역시 이랴이랴.','lore'],
 ['세계 여행에 들고 간 짐은 누나 가방 하나였다.',1,'누나는 출근할 때 가방이 왜 이렇게 무겁지 했대요.','lore'],
 ['세계 여행 사진은 전부 파이리가 찍어줬다.',0,'사진은 브케인이 찍었어요. 근데 등 불꽃 때문에 모든 사진이 주황색이에요.','lore'],
-['여행이 끝나고 사랑이와 망덩이는 미소·시오에게 고맙다고 산딸기 100알을 줬다.',0,'도토리 은행 적자 때문에 산딸기 3알과 코츄 100번으로 대신했어요.','lore']
+['여행이 끝나고 사랑이와 망덩이는 미소·시오에게 고맙다고 산딸기 100알을 줬다.',0,'도토리 은행 적자 때문에 산딸기 3알과 코츄 100번으로 대신했어요.','lore'],
+['다람쥐는 땅에 묻어 둔 도토리를 전부 다시 찾아 먹는다.',0,'못 찾은 도토리가 싹을 틔워서 숲을 넓히는 데 도움을 줘요.'],
+['다람쥐 앞니는 다 자라면 더 이상 자라지 않는다.',0,'설치류라서 앞니가 평생 자라요. 그래서 계속 갉아서 닳게 해요.'],
+['우리나라 숲에 사는 다람쥐는 겨울잠을 잔다.',1,'겨울잠을 자다가 중간중간 깨서 모아둔 먹이를 먹어요.'],
+['청설모와 다람쥐는 같은 동물이다.',0,'청설모가 몸집이 더 크고 서로 다른 종이에요.'],
+['도토리는 참나무 종류의 열매다.',1,'상수리나무, 신갈나무 같은 참나무 열매를 도토리라고 해요.'],
+['도토리는 날로 먹어도 떫지 않다.',0,'타닌 때문에 떫어서 물에 우려서 먹어요.'],
+['다람쥐는 볼주머니에 먹이를 넣어 나른다.',1,'볼이 빵빵해지는 이유예요.'],
+['산딸기는 장미과 식물이다.',1,'딸기, 사과, 복숭아도 장미과예요.'],
+['딸기 겉에 박힌 작은 알갱이 하나하나가 사실 열매다.',1,'씨처럼 보이는 알갱이가 진짜 열매(수과)예요.'],
+['토마토는 식물학적으로 채소다.',0,'씨를 품은 열매라서 식물학적으로는 과일이에요.'],
+['꿀은 아주 오래 두어도 잘 상하지 않는다.',1,'수분이 적고 산성이라 세균이 자라기 어려워요.'],
+['한국의 김장 문화는 유네스코 인류무형문화유산이다.',1,'2013년에 등재됐어요.'],
+['고추는 원래 한반도에서 자라던 식물이다.',0,'고추는 아메리카 대륙이 원산이에요.'],
+['한글날은 10월 3일이다.',0,'10월 3일은 개천절이고, 한글날은 10월 9일이에요.'],
+['제주도는 우리나라에서 가장 큰 섬이다.',1,'섬 한가운데에 한라산이 있어요.'],
+['독도는 섬 하나로만 이루어져 있다.',0,'동도와 서도 두 섬과 여러 바위섬으로 이루어져 있어요.'],
+['후쿠오카 오호리 공원 연못은 원래 후쿠오카성의 해자(성 둘레 물길)였다.',1,'옛 성의 해자를 정비해서 공원으로 만들었어요.'],
+['오호리 공원 연못 가운데에는 다리로 이어진 섬들이 있다.',1,'다리를 건너며 연못 한가운데를 가로질러 갈 수 있어요.'],
+['오호리 공원 연못에서는 백조 모양 보트를 탈 수 있다.',1,'보트 하우스에서 빌릴 수 있어요.'],
+['후쿠오카는 일본 혼슈에 있는 도시다.',0,'규슈 북부에 있는 도시예요.'],
+['후쿠오카 하카타 라멘은 돼지 뼈 국물(돈코츠)로 유명하다.',1,'돼지 뼈를 오래 끓인 뽀얗고 진한 국물이 특징이에요.'],
+['부산에서 후쿠오카까지는 배를 타고도 갈 수 있다.',1,'부산항에서 후쿠오카 하카타항으로 가는 배가 다녀요.'],
+['사람은 렘(REM) 수면 때만 꿈을 꾼다.',0,'렘 수면 때 꿈이 가장 생생하지만 다른 수면 단계에서도 꿈을 꿔요.'],
+['자고 일어나면 키가 아주 조금 커져 있다.',1,'누워 있는 동안 척추 사이 디스크가 펴져서 아침 키가 조금 더 커요.'],
+['야생 코끼리는 하루의 대부분을 잠으로 보낸다.',0,'야생 코끼리는 하루 2시간 정도만 잔다는 연구가 있어요.'],
+['코알라는 하루에 4시간 정도만 잔다.',0,'하루 18시간 넘게 자기도 해요. 유칼립투스 잎이 에너지가 적어서 많이 쉬어요.'],
+['돌고래는 뇌의 반쪽씩 번갈아 가며 잠을 잔다.',1,'한쪽 뇌는 깨어 있어서 숨 쉬러 물 위로 올라갈 수 있어요.'],
+['야생 기린은 하루에 10시간 넘게 잔다.',0,'야생 기린은 하루에 몇 시간 안 자고, 그것도 짧게 나눠서 자요.'],
+['얼룩말 줄무늬는 개체마다 모양이 다르다.',1,'사람 지문처럼 똑같은 줄무늬는 없어요.'],
+['얼룩말의 털 아래 피부는 하얀색이다.',0,'털 아래 피부는 검은색이에요.'],
+['얼룩말은 말처럼 쉽게 길들여서 탈 수 있다.',0,'성질이 예민하고 사나워서 가축이 되지 못했어요.'],
+['기린의 목뼈 개수는 사람보다 훨씬 많다.',0,'사람과 똑같이 7개예요. 뼈 하나하나가 아주 길 뿐이에요.'],
+['펭귄은 모두 남극에서만 산다.',0,'갈라파고스 펭귄처럼 적도 근처에 사는 펭귄도 있어요.'],
+['문어의 피는 빨간색이다.',0,'구리가 들어 있는 헤모시아닌 때문에 파란색이에요.'],
+['해달은 잘 때 떠내려가지 않게 서로 손을 잡기도 한다.',1,'다시마를 몸에 감고 자기도 해요.'],
+['코끼리는 점프를 하지 못한다.',1,'몸이 무거워서 네 발이 동시에 땅에서 떨어지지 않아요.'],
+['고양이는 기분이 좋을 때만 갸르릉 소리를 낸다.',0,'아프거나 불안할 때도 갸르릉거려요.'],
+['토끼는 당근을 주식으로 먹어야 건강하다.',0,'주식은 건초예요. 당근은 당분이 많아서 가끔 주는 간식이에요.'],
+['금붕어의 기억력은 3초밖에 안 된다.',0,'몇 달 동안 기억한다는 실험 결과가 있어요.'],
+['낙타 혹 속에는 물이 가득 들어 있다.',0,'혹에는 지방이 저장돼 있어요.'],
+['홍학은 태어날 때부터 분홍색이다.',0,'새끼 때는 회색빛이고, 먹이 속 색소가 쌓여서 분홍색이 돼요.'],
+['개의 꼬리에도 뼈가 있다.',1,'척추에서 이어진 꼬리뼈들로 되어 있어서, 다치면 아파해요.'],
+['마카다미아는 개에게 해로울 수 있다.',1,'먹으면 다리에 힘이 빠지고 떨리는 증상이 생길 수 있어요.'],
+['포메라니안의 털은 속털과 겉털 두 겹으로 되어 있다.',1,'부드러운 속털과 긴 겉털이 있는 이중모라 그렇게 풍성해요.'],
+['포메라니안은 털을 바짝 밀면 털이 잘 안 자라는 경우가 있다.',1,'털을 민 뒤 털이 잘 나지 않는 탈모가 생길 수 있어서 조심해야 해요.'],
+['하품은 보기만 해도 따라 하게 될 수 있다.',1,'하품은 옮아요. 개도 사람 하품을 따라 한다는 연구가 있어요.'],
+['하늘이 파란 건 바다 색이 비치기 때문이다.',0,'햇빛 중 파란빛이 공기에 더 많이 흩어져서 파랗게 보여요.'],
+['달은 스스로 빛을 낸다.',0,'햇빛을 반사해서 빛나요.'],
+['지구에서는 늘 달의 같은 면만 보인다.',1,'달이 한 바퀴 자전하는 시간과 지구를 한 바퀴 도는 시간이 같아서예요.'],
+['달에서 몸무게를 재면 지구보다 무겁게 나온다.',0,'달의 중력은 지구의 약 6분의 1이라 훨씬 가볍게 나와요.'],
+['달에서는 큰 소리로 부르면 멀리 있는 친구에게 들린다.',0,'달에는 공기가 없어서 소리가 전달되지 않아요. 그래서 우주인은 무전기를 써요.'],
+['처음으로 우주에 간 사람은 닐 암스트롱이다.',0,'1961년 유리 가가린이에요. 암스트롱은 1969년에 달에 처음 발을 디딘 사람이에요.'],
+['무지개는 해를 등지고 서야 볼 수 있다.',1,'햇빛이 내 뒤에서 빗방울에 비쳐야 무지개가 보여요.'],
+['얼음은 물에 넣으면 가라앉는다.',0,'얼음은 물보다 가벼워서 떠요.'],
+['물은 약 4도일 때 밀도가 가장 크다.',1,'그래서 추운 겨울에도 깊은 호수 바닥은 4도 정도로 유지돼요.'],
+['혀는 부위마다 느끼는 맛이 정해져 있다.',0,'혀 지도는 오해예요. 혀 전체에서 여러 맛을 느껴요.'],
+['어른이 아기보다 뼈 개수가 많다.',0,'아기는 약 300개, 자라면서 뼈가 붙어 어른은 206개가 돼요.'],
+['너무 귀여운 걸 보면 꽉 깨물고 싶어지는 마음을 귀여운 공격성이라고 부른다.',1,'귀여움이 너무 클 때 생기는 자연스러운 반응이에요.'],
+['개와 눈을 맞추면 사람과 개 모두 옥시토신이 늘어난다는 연구가 있다.',1,'2015년 일본 연구팀이 발표해서 화제가 됐어요.'],
+['세계 최초의 인스턴트 라면은 한국에서 만들어졌다.',0,'1958년 일본에서 처음 나왔어요. 한국 최초는 1963년 삼양라면이에요.'],
+['수박은 대부분이 물로 되어 있다.',1,'90% 넘게 수분이에요.'],
+['당근을 아주 많이 먹으면 피부가 노래질 수 있다.',1,'베타카로틴이 쌓여서 그래요. 덜 먹으면 다시 돌아와요.'],
+['발톱이 손톱보다 빨리 자란다.',0,'손톱이 발톱보다 훨씬 빨리 자라요.'],
+['정전기는 건조한 겨울에 더 잘 생긴다.',1,'공기가 건조하면 몸에 쌓인 전기가 잘 빠져나가지 않아요.'],
+['북극곰은 털 아래 피부가 검은색이다.',1,'털은 투명에 가까워서 빛을 반사해 하얗게 보여요.'],
+['코끼리 코 속에는 뼈가 있다.',0,'뼈 없이 아주 많은 근육으로만 되어 있어요.'],
+['자이언트판다는 곰과 동물이다.',1,'대나무를 주로 먹지만 곰 가족이에요.'],
+['나무늘보는 일주일에 한 번쯤만 화장실에 간다.',1,'소화가 아주 느려서, 그때만 나무에서 내려와요.'],
+['양파를 썰면 눈물이 나는 건 양파에서 나오는 기체 때문이다.',1,'썰 때 나오는 성분이 눈을 자극해서 눈물이 나요.'],
+['고양이는 단맛을 잘 느끼지 못한다.',1,'단맛 수용체 유전자가 제대로 작동하지 않아요.'],
+['코를 맞대는 인사 코츄를 처음 생각해 낸 건 사랑이다.',1,'망덩이와 만난 지 사흘째 되던 날, 사랑이가 먼저 코를 쭉 내밀었어요. 그게 세상 첫 코츄예요.','lore'],
+['사랑이가 코츄를 생각해 낸 건 자는 형 얼굴에 코를 대보다가였다.',0,'망덩이가 자꾸 엉덩이 냄새만 맡으려고 해서, 사랑이가 코로 인사하자며 방향을 돌린 게 시작이에요.','lore'],
+['사랑이는 코츄를 발명한 날을 기념해 매년 도토리 한 알을 화분에 묻는다.',1,'아직 싹이 난 적은 없어요. 사랑이는 언젠가 형 방이 도토리 숲이 될 거라고 믿어요.','lore'],
+['사랑이는 코츄 특허를 내서 코츄할 때마다 도토리를 받는다.',0,'코츄는 공짜여야 한다며 특허를 거절했어요. 도토리 은행장인데 이것만은 무료래요.','lore'],
+['코츄단 운동회 장소는 형 방 침대 위다.',1,'푹신해서 넘어져도 안 아파요. 자고 있는 형 다리가 장애물 코스가 돼요.','lore'],
+['운동회 팀은 산딸기팀과 도토리팀으로 나뉜다.',1,'망덩이가 산딸기팀, 사랑이가 도토리팀 주장이에요.','lore'],
+['운동회 달리기 종목 1등은 늘 룩말이다.',0,'룩말은 출발 신호 전에 뛰어나가서 매번 실격이에요. 치타한테 반칙이라고 우기던 룩말이 정작 반칙왕이래요.','lore'],
+['운동회 줄다리기 줄은 형 양말을 여러 켤레 묶어서 만든다.',1,'미뇽이 양말 무덤에서 꺼내 왔어요. 경기가 끝나면 다시 정중하게 묻어줘요.','lore'],
+['줄다리기는 리니가 있는 팀이 항상 이긴다.',0,'리니가 목을 너무 높이 들어서 줄이 위로 떠버려요. 그래서 리니가 끼면 늘 무승부예요.','lore'],
+['운동회 개회 선언은 도기의 한 마디로 한다.',1,'그날의 한 마디는 역시 코츄였어요. 다들 박수를 쳤대요.','lore'],
+['운동회 응원가는 새로 작곡한 노래다.',0,'코츄단 단가를 거꾸로 부른 거예요. 가사가 전부 코츄라 거꾸로 부르면 츄코츄코가 돼요.','lore'],
+['이어달리기 바통은 사랑이의 도토리다.',1,'사랑이는 바통이 바뀌었을까 봐 받을 때마다 냄새부터 맡느라 늦게 뛰어요.','lore'],
+['미소와 시오는 2인 3각 경기에서 우승했다.',0,'미소는 왼쪽, 시오는 오른쪽으로 달리는 버릇 때문에 출발하자마자 제자리에서 빙글빙글 돌았어요. 예술 점수만 받았대요.','lore'],
+['운동회 심판은 테디가 맡았다.',0,'심판은 미뇽이었어요. 테디는 심판 시켜달라고 방문 밖에서 계속 짖었어요.','lore'],
+['운동회 우승 상품은 형 베개 위에서 하룻밤 자기 권리다.',0,'그건 코츄 대회 상품이에요. 운동회 상품은 형 목 위 안마기 자리 1주일 이용권이에요.','lore'],
+['운동회에서 파이리와 브케인은 성화 봉송을 맡았다.',1,'불꽃이 진짜라서 다들 살짝 무서워했어요. 형 코골이가 시작된 뒤에만 뛰었대요.','lore'],
+['운동회 최종 우승은 도토리팀이었다.',0,'두 팀이 동점이었어요. 누나가 잠결에 둘 다 잘했어라고 해서 공동 우승이 됐어요.','lore'],
+['운동회 날 똘망이는 빨간 옷을 입고 기록원을 했다.',1,'기록은 완벽했는데, 중간에 옷이 벗겨져서 뒷부분 기록이 전부 똘똘똘이에요.','lore'],
+['형 방 밤 축제는 형이 침펄 토론을 틀고 잠든 순간 시작된다.',1,'형이 3초 만에 잠드는 게 축제 개막 신호예요.','lore'],
+['밤 축제 조명은 형 휴대폰 화면 불빛이다.',0,'이브이가 형 휴대폰 알람을 무서워해서 휴대폰은 금지예요. 조명은 브케인의 등 불꽃이에요.','lore'],
+['밤 축제의 메인 무대는 형 침대 위다.',0,'메인 무대는 형 책상 위예요. 키보드는 무대 계단, 마우스는 무대 소품이에요.','lore'],
+['밤 축제의 첫 곡은 늘 방방이다.',1,'방방절 이후로 축제 첫 곡은 무조건 방방이에요.','lore'],
+['밤 축제에서 망덩이는 산딸기 주스 가게를 열었다.',1,'한 잔에 도토리 1개를 받기로 했는데, 사랑이가 외상으로 다 마셔버렸어요.','lore'],
+['밤 축제 먹거리 장터 인기 1위는 미뇽의 보물 경매다.',0,'인기 1위는 이브이의 과자 부스러기 뽑기예요. 미뇽은 에어팟을 경매에 내놨다가 아까워서 바로 취소했어요.','lore'],
+['리니는 밤 축제 때 불꽃놀이 담당이었다.',0,'불꽃은 파이리 담당이에요. 리니는 천장 리니 자리 옆에 별 스티커를 붙이는 별빛 담당이었어요.','lore'],
+['밤 축제 도중 형이 뒤척이면 모두 그 자리에서 얼음이 된다.',1,'최장 기록은 룩말의 40분이에요. 한 발을 든 채였대요.','lore'],
+['밤 축제 마지막 순서는 다 같이 형 목 위에 올라가 하는 단체 코츄다.',0,'형 목 위는 사랑이 자리라 다 같이는 못 올라가요. 마지막은 침대 위에서 동그랗게 모여 하는 둥근 코츄예요.','lore'],
+['밤 축제 입장권은 도토리 한 알이다.',0,'입장권은 산딸기 꼭지예요. 망덩이 농장에서만 나와서 축제 철이면 꼭지 값이 올라요.','lore'],
+['밤 축제가 형에게 한 번도 들키지 않은 건 테디 덕분이다.',1,'시끄러운 소리가 나도 형은 테디가 또 짖은 줄 알거든요. 테디는 좀 억울해해요.','lore'],
+['밤 축제가 끝나면 청소는 도기가 혼자 다 한다.',0,'청소 당번은 가위바위보로 정해요. 사랑이는 매번 바위만 내서 매번 져요.','lore'],
+['망덩이 산딸기 농장이 위기를 맞은 건 비가 너무 많이 와서다.',0,'진짜 원인은 누나가 화분 위치를 바꾼 거예요. 해가 안 들어서 산딸기들이 시무룩해졌어요.','lore'],
+['농장 위기 때 망덩이는 이브이 월급을 산딸기 3알에서 2알로 줄였다.',0,'월급은 그대로 지켰어요. 대신 망덩이가 자기 몫을 반으로 줄였대요. 역시 맏형이에요.','lore'],
+['이브이는 농장이 어려울 때 월급 없이 일하겠다고 했다.',1,'조건은 하나, 과자 봉지 뜯는 소리가 나면 일하다 말고 가도 되는 거였어요.','lore'],
+['사랑이 도토리 은행은 위기의 농장에 도토리를 빌려줬다.',1,'이자는 하루 1개였는데, 사랑이가 99 다음에 1000으로 세는 바람에 계약서가 엉망이 됐어요.','lore'],
+['농장을 살리려고 망덩이가 처음 시작한 사업은 산딸기 잼이다.',0,'처음 시작한 건 산딸기 향 맡기 체험이에요. 가격은 꼬리 흔들기 3번이었어요.','lore'],
+['산딸기 향 맡기 체험의 첫 손님은 테디였다.',1,'테디는 산딸기 말고 망덩이 엉덩이 냄새를 맡으려다 쫓겨났어요.','lore'],
+['하와이 2호점 직원 거북이가 위기 소식을 듣고 도우러 와서 농장을 살렸다.',0,'거북이는 너무 느려서 아직 오는 중이에요. 응원 엽서만 먼저 도착했어요.','lore'],
+['똘망이는 빨간 옷을 입고 농장 회생 계획서를 써줬다.',1,'계획서 1번은 해 드는 곳으로 화분 옮기기였어요. 제일 간단한데 아무도 생각 못 했대요.','lore'],
+['산딸기 화분을 창가로 옮긴 건 망덩이다.',0,'옮긴 건 리니예요. 긴 목으로 살살 밀어서 옮기고, 그날 농장 명예 직원이 됐어요.','lore'],
+['농장 위기 동안 빨강대장 산딸기는 결국 먹혔다.',0,'망덩이가 끝까지 지켰어요. 지금은 말려서 지하 창고 맨 위 칸에 모셔져 있어요.','lore'],
+['농장이 다시 살아난 날 망덩이는 직원 회식을 열었다.',1,'메뉴는 산딸기 한 알을 셋이 나눠 먹기였어요. 이브이도 리니도 감동했대요.','lore'],
+['농장 위기 때 미뇽은 보물지도로 새 산딸기 씨앗을 찾아줬다.',1,'씨앗은 누나 가방 앞주머니에 하나 더 있었어요. 첫 씨앗이 나온 바로 그 주머니예요.','lore'],
+['위기를 넘긴 뒤 망덩이는 농장 이름을 엉덩이 농장으로 바꿨다.',0,'망덩이는 아직도 자기 엉덩이가 귀엽다는 걸 몰라요. 새 이름은 웃는 산딸기 농장이에요.','lore'],
+['농장 위기를 겪은 뒤 망덩이는 매일 아침 화분에 코츄 인사를 한다.',1,'산딸기도 인사를 받아야 잘 큰다고 믿어요. 올해 산딸기가 제일 많이 열렸대요.','lore'],
+['테디와 인형들의 영역 다툼은 거실 소파에서 시작됐다.',1,'테디는 소파 왼쪽 쿠션이 자기 거라고 했고, 인형들은 거기가 제일 푹신하다는 걸 알아버렸어요.','lore'],
+['테디는 영역 표시로 소파 쿠션마다 자기 장난감을 올려뒀다.',1,'인형들은 밤마다 장난감을 옮기고, 테디는 아침마다 짖으며 되돌려 놨어요.','lore'],
+['영역 다툼 때 인형들 대표로 협상하러 간 건 사랑이다.',0,'협상 대표는 도기예요. 하루 한 마디라서 말실수할 일이 없거든요.','lore'],
+['협상장에서 도기가 한 한 마디는 코츄였다.',0,'그날의 한 마디는 같이였어요. 테디는 그 말을 듣고 한참 조용해졌대요.','lore'],
+['테디는 협상 조건으로 세탁기 기지는 영원히 자기만 쓰겠다고 했다.',1,'인형들은 바로 찬성했어요. 다들 세탁기를 제일 무서워하거든요.','lore'],
+['영역 다툼 중 테디가 제일 많이 짖은 상대는 룩말이다.',1,'줄무늬가 움직이면 테디 눈이 어지럽대요. 룩말은 자기가 멋있어서 그런 줄 알아요.','lore'],
+['소파는 결국 왼쪽 오른쪽 반으로 나눠 쓰기로 했다.',0,'시간으로 나눴어요. 낮에는 테디, 밤에는 인형들 차지예요.','lore'],
+['화해의 선물로 사랑이는 테디에게 도토리를 줬다.',1,'은행장 사랑이가 처음으로 이자 없이 내준 도토리예요. 테디는 세탁기 기지에 보관해요.','lore'],
+['테디와 인형들이 화해하고 처음 같이 한 건 코츄다.',1,'테디 코가 촉촉하고 차가워서 사랑이가 깜짝 놀랐대요. 진짜 강아지 코였으니까요.','lore'],
+['화해한 뒤로 테디는 더 이상 짖지 않는다.',0,'여전히 매일 짖어요. 다만 이제는 점호가 아니라 잘 자라는 인사래요.','lore'],
+['테디는 화해 후 코츄단 명예 경비대장이 되었다.',1,'형이 깨려고 하면 짖어서 신호를 주는 게 임무예요.','lore'],
+['영역 다툼이 시작된 날 미소와 시오는 테디 편을 들었다.',0,'둘은 중간에서 360도 코츄를 하며 양쪽을 진정시키려 했어요. 결국 자기들이 어지러워서 누웠지만요.','lore'],
+['테디의 세탁기 기지에 처음 초대받은 인형은 망덩이다.',0,'처음 초대받은 건 미뇽이에요. 보물지도에 세탁기를 그려 넣어도 된다는 허락까지 받았어요.','lore'],
+['누나는 테디와 인형들이 싸운 걸 눈치챘다.',0,'누나는 쿠션이 매일 엉망인 걸 전부 테디 탓으로 알아요. 테디는 그것도 억울해해요.','lore'],
+['미소와 시오는 생일이 같은 날이다.',1,'쌍둥이라 생일이 같아요. 미소가 3초 먼저라서 축하도 미소한테 3초 먼저 해요.','lore'],
+['미소·시오 생일을 제일 먼저 챙긴 건 도기다.',1,'모든 인형의 생일을 외우는 도기가 그날 아침 코츄 두 번으로 깨워줬어요.','lore'],
+['미소·시오 생일 케이크는 진짜 먹는 케이크였다.',0,'형 베개를 겹쳐 만든 푹신 케이크였어요. 꼭대기에 망덩이가 눈물을 머금고 산딸기 한 알을 올렸어요.','lore'],
+['생일 촛불은 파이리 꼬리 불꽃이 대신했다.',1,'아무리 후 불어도 안 꺼져서 미소·시오가 헥헥댔어요.','lore'],
+['미소와 시오는 생일 소원으로 서로 다른 소원을 빌었다.',0,'둘이 똑같이 360도 코츄 18바퀴 성공을 빌었어요. 17바퀴 기록을 깨고 싶대요.','lore'],
+['생일 선물로 사랑이는 미소·시오에게 도토리를 하나씩 줬다.',0,'도토리 은행이 적자라서 도토리 한 알을 반으로 쪼개 둘에게 나눠줬어요.','lore'],
+['미뇽은 생일 선물로 보물지도 속 보물을 하나 내줬다.',1,'양말 무덤에서 꺼낸 짝 없는 양말 두 짝이에요. 미소·시오는 그걸 쌍둥이 망토로 써요.','lore'],
+['미소·시오 생일 파티에 테디는 초대받지 못했다.',0,'화해 후 처음 초대받은 파티였어요. 테디는 축하한다고 열두 번 짖었어요.','lore'],
+['미소·시오 생일 축하 노래는 방방 멜로디로 불렀다.',1,'가사만 생일 축하로 바꿨어요. 마지막 소절에서 다 같이 방방 뛰었대요.','lore'],
+['생일 다음 날 미소·시오는 사랑이와 망덩이를 태워주지 않았다.',1,'생일 다음 날은 태워주기 쉬는 날이래요. 사랑이와 망덩이는 걸어 다니다 지쳐서 일찍 잤어요.','lore'],
+['생일날 미소·시오는 드디어 360도 코츄 18바퀴에 성공했다.',0,'16바퀴째에 너무 웃겨서 둘 다 쓰러졌어요. 18바퀴는 다음 생일 소원이 됐어요.','lore'],
+['미소·시오 생일 파티 사진도 전부 주황색으로 나왔다.',1,'사진사가 또 브케인이었거든요. 미소·시오는 주황색이 생일 색이라며 좋아했어요.','lore'],
+['누나가 모르는 코츄단 비밀 회의는 형 옷장 안에서 열린다.',1,'겨울 패딩 주머니가 회의실이에요. 너무 따뜻해서 회의 중에 자주 잠들어요.','lore'],
+['비밀 회의의 의장은 누나다.',0,'누나는 명예 회장이지만 이 회의만큼은 몰라요. 의장은 맏형 망덩이예요.','lore'],
+['비밀 회의 첫 안건은 누나를 위한 깜짝 선물이었다.',1,'첫 씨앗이 나온 누나 가방 앞주머니에 말린 산딸기를 몰래 넣어 두기로 했어요. 보답이래요.','lore'],
+['비밀 회의 투표는 손을 들어서 한다.',0,'다들 손이 짧아서 꼬리를 흔들어 투표해요. 꼬리가 짧은 인형은 코츄 한 번이 한 표예요.','lore'],
+['비밀 회의록은 빨간 옷을 입은 똘망이가 쓴다.',1,'회의록은 옷 비밀 주머니 속, 첫 코츄 기념 도토리 옆에 보관해요.','lore'],
+['비밀 회의에서 누나의 비밀 별명을 정했다.',1,'만장일치로 정한 별명은 따뜻한 산이에요. 밤에 올라가면 따뜻해서래요.','lore'],
+['비밀 회의에서 누나 휴대폰 속 형? 폴더를 몰래 보기로 결정했다.',0,'명예 회장님 존중 차원에서 부결됐어요. 파이리만 끝까지 찬성했대요.','lore'],
+['비밀 회의 도중 누나가 옷장 문을 연 적이 있다.',1,'다들 그대로 굳어서 평범한 인형인 척했어요. 누나는 왜 다 여기 있지? 하고 형을 의심했대요.','lore'],
+['비밀 회의 암호는 산딸기다.',0,'암호는 이랴이랴예요. 근데 미소·시오가 암호를 들으면 자꾸 달려 나가서 문제예요.','lore'],
+['화해 이후 테디는 비밀 회의 문지기를 맡았다.',1,'누나가 다가오면 짖어서 알려줘요. 누나는 그냥 테디가 또 짖네 하고 지나가요.','lore'],
+['비밀 회의에서 가장 오래 걸린 안건은 형 양말 무덤 이사 문제다.',1,'미뇽이 끝까지 반대해서, 회의 세 번 끝에 그대로 두기로 했어요.','lore'],
+['비밀 회의는 매번 회의록 낭독으로 끝난다.',0,'매번 도기의 한 마디로 끝나요. 회의가 길어진 날의 한 마디는 졸려였대요.','lore'],
+['세계 여행 2탄 달나라 여행 준비의 총책임자는 똘망이다.',1,'빨간 옷 입은 똘망이가 맡았어요. 옷 벗은 똘망이는 우주복이 답답하똘 하며 매번 탈출해요.','lore'],
+['달나라에 입고 갈 우주복은 비닐봉지로 만들었다.',0,'누나 털모자를 뒤집어 만든 털 우주복이에요. 달은 추울 것 같대요.','lore'],
+['달에서는 몸이 가벼워진다는 걸 듣고 제일 신난 건 미소와 시오다.',1,'달 중력은 지구의 약 6분의 1이라, 사랑이와 망덩이를 태워도 하나도 안 무겁대요.','lore'],
+['달나라 출발 연습은 형 책상 위에서 한다.',0,'출발 연습은 형 배 위에서 해요. 형이 숨 쉴 때마다 오르락내리락해서 무중력 느낌이 난대요.','lore'],
+['달에 가면 사랑이가 제일 먼저 하려는 일은 달 도토리 찾기다.',1,'달 표면의 동그란 구멍들이 누가 도토리를 묻었던 자리라고 믿어요.','lore'],
+['망덩이가 달에 낼 산딸기 농장 3호점 이름은 별딸기 농장이다.',0,'이름은 달딸기 농장이에요. 직원은 아직 못 구했어요.','lore'],
+['테디는 약속대로 달나라 여행 때 미소를 타고 가기로 확정됐다.',0,'미소가 끝까지 동의를 안 해서, 미소와 시오를 번갈아 타는 걸로 타협했어요.','lore'],
+['이번 달나라 여행에는 이브이도 같이 간다.',1,'지난번 엽서 28장이 너무 부러웠대요. 농장은 리니가 대신 지켜요.','lore'],
+['달나라 비상식량은 사랑이 도토리다.',0,'비상식량은 망덩이 지하 창고의 말린 산딸기예요. 도토리는 은행 적자라 못 꺼냈어요.','lore'],
+['달나라 여행 지도도 미뇽이 그린다.',1,'이번 지도에는 달 위에 형 양말 무덤 2호까지 그려져 있어요. 다들 불안해해요.','lore'],
+['달나라 출발 날짜는 보름달이 뜨는 날로 정했다.',1,'달이 제일 커 보여서 제일 가까운 날 같대요. 똘망이가 아니라고 해도 아무도 안 들어요.','lore'],
+['달에서 서로 부를 때는 큰 소리로 외치기로 했다.',0,'달에는 공기가 없어 소리가 안 들린다고 똘망이가 알려줬어요. 그래서 신호는 코츄예요.','lore'],
+['달나라 출발 신호는 리니가 맡았다.',1,'목이 제일 길어서 창밖 달이 제일 먼저 보이거든요. 달이 보이면 고개를 세 번 끄덕여요.','lore'],
+['룩말은 달에서 달리기 신기록을 세우겠다고 했다.',1,'몸이 가벼우니 치타도 이길 수 있대요. 출발 반칙만 안 하면요.','lore'],
+['파이리와 브케인은 달나라 로켓 엔진을 맡았다.',0,'로켓 없이 미소·시오를 타고 가요. 파이리와 브케인은 달의 밤을 밝히는 손전등 담당이에요.','lore'],
+['달나라 준비 회의에서 가장 많이 나온 질문은 달에도 형이 있어요?였다.',1,'사랑이가 형 목 위 안마기 없이는 못 잔다고 해서 회의가 한참 멈췄어요.','lore'],
+['다람쥐 토토가 사랑이에게 아직 안 갚은 도토리는 3개다.',1,'12개 중 7개를 갚고, 캐나다 사촌 토니가 2개를 대신 갚아서 3개 남았어요.','lore'],
+['토토가 도토리를 늦게 갚는 건 묻어둔 곳을 잊어버려서다.',1,'토토는 묻은 자리를 구름 모양으로 기억해요. 구름이 자꾸 바뀌는 게 문제예요.','lore'],
+['토토는 도토리 대신 다른 열매로 갚으려다 거절당했다.',1,'가져온 게 은행 열매였는데, 냄새가 너무 심해서 도토리 은행이 문 닫을 뻔했어요.','lore'],
+['사랑이는 토토에게 도토리 빚 이자를 받는다.',0,'친구라서 이자는 안 받아요. 대신 갚으러 올 때마다 코츄 한 번을 받아요.','lore'],
+['토토는 코츄단 운동회에 깜짝 손님으로 나타났다.',1,'빚 갚으러 왔다더니 볼주머니가 텅 비어 있었어요. 대신 이어달리기에서 1등을 했대요.','lore'],
+['토토가 사랑이에게 써준 도토리 차용증은 글씨로 쓰여 있다.',0,'글씨 대신 발자국 12개가 찍혀 있어요. 갚을 때마다 사랑이가 하나씩 지워요.','lore'],
+['토토의 사촌 토니는 캐나다에서 한국으로 이사 왔다.',0,'토니는 아직 캐나다에 살아요. 가끔 단풍잎에 쓴 편지를 바람에 날려 보낸대요.','lore'],
+['토토 덕분에 다람쥐 마을에도 코츄가 퍼졌다.',1,'사랑이가 코츄를 만들었다는 이야기를 토토가 퍼뜨렸어요. 사랑이는 수출 성공이라며 뿌듯해해요.','lore'],
+['미뇽 보물지도의 2번 보물은 누나 머리핀이다.',0,'누나 머리핀 장식은 똘망이 안경이 됐어요. 2번 보물은 소파 틈에서 찾은 동전 하나예요.','lore'],
+['미뇽은 보물지도를 누나 수첩에 몰래 그린다.',0,'형 노트 맨 뒷장에 그려요. 형은 이상한 낙서가 있네 하고 그냥 넘겨요.','lore'],
+['천장 리니 자리 옆에 새로 생긴 별자리 이름은 룩말 자리다.',0,'새 별자리는 코츄 자리예요. 얼룩 두 개가 코를 맞댄 것처럼 보여서 리니가 붙였어요.','lore'],
+['룩말과 리니의 줄무늬 싸움은 아직 결론이 안 났다.',1,'누나에게 물어보자고 의견이 모였는데, 누나가 자고 있어서 아직 못 물어봤대요.','lore'],
+['도기가 1년 중 두 마디를 하는 날은 자기 생일이다.',0,'생일에도 한 마디만 해요. 두 마디를 한 건 코츄단이 처음 생긴 날 딱 하루예요.','lore'],
+['브케인은 불꽃을 키우려고 파이리 칭찬 일기를 쓴다.',1,'파이리에게 받은 칭찬을 다 적어 두고, 불꽃이 약해지면 다시 읽어요.','lore'],
+['파이리는 형이랑 닮았다는 말을 싫어한다.',0,'제일 좋아하는 말이에요. 누나 휴대폰 형? 폴더에 사진이 늘 때마다 꼬리 불꽃이 커져요.','lore'],
+['이브이는 형 휴대폰 알람이 울리면 망덩이 엉덩이 뒤로 숨는다.',1,'제일 동글동글해서 숨기 좋대요. 망덩이는 왜 다들 거기로 숨는지 몰라요.','lore'],
+['똘망이는 안경만 벗어도 귀여운 똘망이가 된다.',0,'옷을 벗어야만 귀여워져요. 안경만 벗으면 앞이 안 보여서 헤매기만 해요.','lore'],
+['사랑이는 형 목 위 안마기 자리를 일주일에 한 번 다른 인형에게 빌려준다.',1,'빌려주는 날은 일요일이에요. 대여료는 당연히 도토리 1개예요.','lore'],
+['형 양말 무덤에 가장 최근 묻힌 건 형의 크리스마스 양말이다.',0,'최근에 묻힌 건 운동회 줄다리기 줄로 쓴 양말 다발이에요. 다 같이 묵념도 했대요.','lore'],
+['침펄 토론을 끝까지 들은 애들은 매주 토론 대회를 연다.',1,'지난주 주제는 도토리가 먼저냐 산딸기가 먼저냐였어요. 결론은 사랑이의 코츄가 먼저였어요.','lore'],
+['토론 대회에서 늘 이기는 건 망덩이다.',0,'늘 이기는 건 옷 입은 똘망이예요. 망덩이는 산딸기 얘기만 나오면 울컥해서 져요.','lore'],
+['사랑이는 일본 여행 때 본 오니기리를 도토리 은행 로고로 썼다.',1,'삼각형 안에 도토리를 그려 넣었어요. 은행 이름도 오니기리 은행으로 바꿀 뻔했어요.','lore'],
+['이브이는 오호리 공원 갈매기에게서 드디어 답장을 받았다.',0,'아직 없어요. 창문에 깃털 하나가 붙어 있던 날, 이브이는 그걸 답장이라고 믿기로 했어요.','lore'],
+['미소와 시오는 할짝할짝 하루 1000번 약속을 처음으로 지켰다.',0,'이번에도 못 지켰어요. 생일날엔 기분이 좋아서 2000번을 넘겼대요.','lore'],
+['코츄단 단가 2절이 새로 생겼다.',1,'2절도 가사가 전부 코츄인데, 마지막에 사랑이 만세가 딱 한 번 들어가요. 코츄를 만든 사랑이에게 바치는 소절이에요.','lore'],
+['리니는 기적의 밤을 다시 만들려고 형 침대 옆에서 기다린 적이 있다.',1,'일주일 내내 기다렸지만 형은 반대쪽으로만 굴렀어요. 그래도 리니는 행복했대요.','lore'],
+['망덩이는 맏형이라서 밥 당번을 매일 혼자 맡는다.',0,'밥 당번은 돌아가며 해요. 망덩이 차례인 날은 반찬이 전부 산딸기라 다들 기다려요.','lore'],
+['사랑이가 형을 깨우고 싶을 때 쓰는 필살기는 코츄다.',1,'형 코에 살짝 코츄하면 형이 재채기하며 깨요. 하루 한 번만 쓰는 비밀 기술이에요.','lore'],
+['누나가 형 방에 오면 애들이 제일 먼저 하는 일은 숨기다.',0,'숨지 않고 일렬로 서서 명예 회장님께 인사해요. 누나 눈엔 그냥 인형들이 줄 서 있는 걸로 보여요.','lore'],
+['도기의 오늘의 한 마디 순위 2위는 산딸기다.',1,'1위 코츄, 2위 산딸기, 3위 졸려예요. 망덩이는 2위 소식에 감동했대요.','lore'],
+['미뇽은 언젠가 날 수 있다는 꿈을 포기했다.',0,'아직 믿어요. 몸이 가벼운 달에서 첫 비행을 하겠대요.','lore'],
+['룩말은 운동회 뒤 형 침대가 세렝게티보다 좋다는 말을 취소했다.',0,'취소는 안 했어요. 달리기엔 너무 푹신해서 운동회 때만 살짝 아쉬웠대요.','lore']
 ];
 const QuizG=(()=>{
   const AW=560,AH=520,Q=10,ANS=7,NQ=15,LIVES=3,BR=92;let s=null;
@@ -2181,8 +2454,11 @@ const BluffG=(()=>{
   function region(k){const top=118,bottom=H-232;if(k==='full')return{x:px0(),y:top,w:playW(),h:bottom-top};
     if(W>=760){const w=Math.min(W/2-24,520),h=H-top-170;return k==='a'?{x:W/2-w-12,y:top+30,w,h:h-30}:{x:W/2+12,y:top+30,w,h:h-30}}
     const h=(H-top-150)/2;return k==='a'?{x:px0(),y:top+26,w:playW(),h:h-26}:{x:px0(),y:top+h+30,w:playW(),h:h-30}}
-  function cells(R){const sc=clamp(Math.min(R.w/3/124,R.h/2/150),.5,1.35),cw=R.w/3,r1=R.y+R.h*.35,r2=R.y+R.h*.79;
-    return{sc,pts:[[R.x+cw*.5,r1],[R.x+cw*1.5,r1],[R.x+cw*2.5,r1],[R.x+R.w/2-cw*.62,r2],[R.x+R.w/2+cw*.62,r2]]}}
+  function cells(R){const n=s.n,sc=clamp(Math.min(R.w/3/124,R.h/2/150),.5,1.35)*(n<=3?1.15:1),cw=R.w/3,r1=R.y+R.h*.35,r2=R.y+R.h*.79,rm=R.y+R.h*.55;let pts;
+    if(n>=5)pts=[[R.x+cw*.5,r1],[R.x+cw*1.5,r1],[R.x+cw*2.5,r1],[R.x+R.w/2-cw*.62,r2],[R.x+R.w/2+cw*.62,r2]];
+    else if(n===4)pts=[[R.x+R.w/2-cw*.62,r1],[R.x+R.w/2+cw*.62,r1],[R.x+R.w/2-cw*.62,r2],[R.x+R.w/2+cw*.62,r2]];
+    else if(n===3)pts=[[R.x+cw*.5,rm],[R.x+cw*1.5,rm],[R.x+cw*2.5,rm]];else pts=[[R.x+R.w/2-cw*.62,rm],[R.x+R.w/2+cw*.62,rm]];
+    return{sc,pts}}
   function trayRects(){const w=Math.min(W-24,520),x0=(W-w)/2,y=H-206,bw=(w-18)/4;return TOOLS.map((t,i)=>({i,x:x0+i*(bw+6),y,w:bw,h:62}))}
   /* ---------- 배경 장식 (고정 난수) ---------- */
   const DEC=(()=>{const r=mulberry32(4242),a=[];for(let i=0;i<46;i++)a.push({x:r(),y:r(),k:r()<.55?'grass':r()<.6?'acorn':'leaf',rot:r()*6,s:.7+r()*.6});return a})();
@@ -2242,18 +2518,18 @@ const BluffG=(()=>{
   function field(R,o,t,mkf){const {sc,pts}=cells(R);pts.forEach(([x,y],i)=>drawSpot(x,y,sc,o,t,i,mkf(i)));return{sc,pts}}
   /* ---------- 로직 ---------- */
   function blank(){return{real:-1,sign:-1,acorn:-1,box:-1}}
-  function autoFill(o){const r=Math.random;if(o.real<0)o.real=Math.floor(r()*N);['sign','acorn','box'].forEach(k=>{if(o[k]<0)o[k]=Math.floor(r()*N)})}
-  function botSetup(){const o=blank();o.real=Math.floor(Math.random()*N);const style=Math.random();['sign','acorn','box'].forEach(k=>{o[k]=(style<.3&&Math.random()<.6)?o.real:Math.floor(Math.random()*N)});return o}
-  function botGuess(o){const w=Array(N).fill(1);['sign','acorn','box'].forEach(k=>{if(o[k]>=0)w[o[k]]+=.5});w.forEach((v,i)=>{w[i]=v*(.6+Math.random()*.8)});return w.indexOf(Math.max(...w))}
+  function autoFill(o){const r=Math.random;if(o.real<0)o.real=Math.floor(r()*s.n);['sign','acorn','box'].forEach(k=>{if(o[k]<0)o[k]=Math.floor(r()*s.n)})}
+  function botSetup(){const o=blank();o.real=Math.floor(Math.random()*s.n);const style=Math.random();['sign','acorn','box'].forEach(k=>{o[k]=(style<.3&&Math.random()<.6)?o.real:Math.floor(Math.random()*s.n)});return o}
+  function botGuess(o){const w=Array(s.n).fill(1);['sign','acorn','box'].forEach(k=>{if(o[k]>=0)w[o[k]]+=.5});w.forEach((v,i)=>{w[i]=v*(.6+Math.random()*.8)});return w.indexOf(Math.max(...w))}
   function hitSpot(tap){const {sc,pts}=cells(region('full'));let best=-1,bd=1e9;pts.forEach(([x,y],i)=>{const d=hyp(tap[0]-x,(tap[1]-(y-6*sc))*.85);if(d<70*sc&&d<bd){bd=d;best=i}});return best}
-  function newRound(now){s.ph='set';s.phAt=now;s.mine=blank();s.sel=0;s.opSet=null;s.myG=-1;s.opG=-1;s.sent=false;s.gSent=false;s.res=null;if(s.o.bot){s.opSet=botSetup();s.botGAt=null}}
+  function newRound(now){if(s.nNext&&s.nNext!==s.n){s.n=s.nNext;bigText('둘 다 못 맞혀서 사랑이가 '+s.n+'마리로 줄었다!',true,1800,true)}s.ph='set';s.phAt=now;s.mine=blank();s.sel=0;s.opSet=null;s.myG=-1;s.opG=-1;s.sent=false;s.gSent=false;s.res=null;if(s.o.bot){s.opSet=botSetup();s.botGAt=null}}
   function sendSetup(){if(s.sent)return;autoFill(s.mine);s.sent=true;sendEv({k:'bs',p:s.ri,a:[s.mine.real,s.mine.sign,s.mine.acorn,s.mine.box]});beep(880,.15,'triangle',.06)}
-  function settle(now){const okMe=s.myG===s.opSet.real,okOp=s.opG===s.mine.real;if(okMe)s.sc++;if(okOp)s.osc++;s.res={okMe,okOp};s.ph='rev';s.phAt=now;
+  function settle(now){const okMe=s.myG===s.opSet.real,okOp=s.opG===s.mine.real;if(okMe)s.sc++;if(okOp)s.osc++;if(!okMe&&!okOp)s.nNext=Math.max(2,s.n-1);s.res={okMe,okOp};s.ph='rev';s.phAt=now;
     bigText(okMe&&okOp?'둘 다 맞혔다!':okMe?'진짜 찾았다! +1':okOp?opName()+'가 내 진짜를 찾았어요':'둘 다 속았다!',true,1500,okOp&&!okMe);if(okMe){confetti(W/2,H*.3,26);beep(990,.2,'triangle',.07)}}
   return{
     id:'bluff',name:'진짜 사랑이 심리전',btn:'준비 완료',stat:null,tapPos:true,
-    rules:['도토리 밭에 사랑이가 5마리! 먼저 👑 진짜 사랑이 하나를 몰래 골라요. 상대는 몰라요.','위장 도구 3개(🪧 내가 진짜 팻말, 🌰 도토리, 📦 박스)를 아무 사랑이에게나 붙여요. 박스를 씌우면 안이 안 보여요. 도구는 효과 없는 속임수예요!','그다음 상대 밭을 보고 상대의 진짜가 누군지 맞혀요. 맞히면 1점, 3판 해서 점수 많은 쪽이 승리!'],
-    init(o){s={o,ri:0,sc:0,osc:0,ended:false,endAt:0,os:{},og:{}};newRound(o.now)},
+    rules:['도토리 밭에 사랑이가 5마리! 먼저 👑 진짜 사랑이 하나를 몰래 골라요. 상대는 몰라요.','위장 도구 3개(🪧 내가 진짜 팻말, 🌰 도토리, 📦 박스)를 아무 사랑이에게나 붙여요. 박스를 씌우면 안이 안 보여요. 도구는 효과 없는 속임수예요!','그다음 상대 밭을 보고 상대의 진짜가 누군지 맞혀요. 맞히면 1점, 3판 해서 점수 많은 쪽이 승리! 둘 다 못 맞히면 다음 판부터 사랑이가 한 마리씩 줄어요(최소 2마리).'],
+    init(o){s={o,n:5,nNext:0,ri:0,sc:0,osc:0,ended:false,endAt:0,os:{},og:{}};newRound(o.now)},
     step(dt,now,inp){if(s.ended)return;const el=(now-s.phAt)/1000;if(!s.o.bot){if(!s.opSet&&s.os[s.ri])s.opSet=s.os[s.ri];if(s.opG<0&&s.og[s.ri]!=null&&s.ph==='guess')s.opG=s.og[s.ri]}
       if(s.ph==='set'){
         if(!s.sent){if(inp.tap){const [tx,ty]=inp.tap;let hit=false;
@@ -2263,7 +2539,7 @@ const BluffG=(()=>{
           if(inp.pressed&&s.mine.real>=0)sendSetup();if(el>SET)sendSetup()}
         if(s.sent&&s.opSet){s.ph='guess';s.phAt=now;bigText(opName()+' 밭으로!',true,1000)}}
       else if(s.ph==='guess'){
-        if(s.myG<0){if(inp.tap){const i=hitSpot(inp.tap);if(i>=0)s.myG=i}if(s.myG<0&&el>GUESS)s.myG=Math.floor(Math.random()*N);
+        if(s.myG<0){if(inp.tap){const i=hitSpot(inp.tap);if(i>=0)s.myG=i}if(s.myG<0&&el>GUESS)s.myG=Math.floor(Math.random()*s.n);
           if(s.myG>=0&&!s.gSent){s.gSent=true;sendEv({k:'bg',p:s.ri,g:s.myG});beep(520,.1,'triangle',.05);bubble('me',(s.myG+1)+'번 너지!',1.2)}}
         if(s.o.bot&&s.opG<0){if(s.botGAt==null)s.botGAt=now+2500+Math.random()*5000;if(now>=s.botGAt)s.opG=botGuess(s.mine)}
         if(s.myG>=0&&s.opG>=0)settle(now)}
@@ -2299,88 +2575,7 @@ const BluffG=(()=>{
       if(s.ph!=='rev')drawBubble(W/2,H-250,C.bub.me,now);drawParts()}
   }})();
 
-/* ================= 게임 22: 누나 vs 테디 카드 심리전 ================= */
-const ECardG=(()=>{
-  const NRND=4,TURN=15,SHOW=1.7,REND=2.8,PTS={nuna:1,teddy:3};let s=null;
-  const DOLL=[0,1,3,4],TAUNT=['이번엔 인형이야','진짜 나간다…','눈 보면 알지?','ㅋㅋㅋ 떨려?','믿어봐 😇','지금이다!'];
-  const side=r=>((r+s.o.me)%2===0)?'nuna':'teddy',opSide=r=>side(r)==='nuna'?'teddy':'nuna';
-  const SP={nuna:'누나',teddy:'테디'};
-  function hand(){const h=[];for(let i=0;i<5;i++)if(!s.used[i])h.push(i);return h}
-  const isSp=i=>i===4;
-  function layout(){const n=5,cw=Math.min(78,(W-40)/5.4),ch=cw*1.38,y=H-150-ch-46,gap=cw*.18,x0=W/2-(n*cw+(n-1)*gap)/2;return{cw,ch,y,cards:Array.from({length:n},(_,i)=>[x0+i*(cw+gap),y]),tauntY:y-46}}
-  function tauntRects(){const L=layout(),w=Math.min(W-24,520),x0=(W-w)/2,bw=(w-10)/3,out=[];TAUNT.forEach((t,i)=>{if(i<3)out.push({i,x:x0+i*(bw+5),y:L.tauntY-36,w:bw,h:30});else out.push({i,x:x0+(i-3)*(bw+5),y:L.tauntY,w:bw,h:30})});return out}
-  function cardFace(x,y,w,h,kind,ci,glow){ctx.save();ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=10;ctx.shadowOffsetY=4;ctx.fillStyle=kind==='nuna'?'#ffe3ea':kind==='teddy'?'#e8f4ff':'#fbf1dd';rr(x,y,w,h,10);ctx.fill();ctx.restore();
-    ctx.strokeStyle=glow||(kind==='nuna'?'#ff7aa2':kind==='teddy'?'#6fb6ff':'#d7b98a');ctx.lineWidth=glow?4:2.5;rr(x,y,w,h,10);ctx.stroke();
-    const cx=x+w/2,cy=y+h*.42,r=w*.34;
-    if(kind==='nuna'){ctx.fillStyle='#ffd0db';ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();ctx.fillStyle='#3a2414';ctx.beginPath();ctx.arc(cx,cy-r*.15,r*.78,Math.PI,0);ctx.fill();ctx.fillRect(cx-r*.78,cy-r*.15,r*.22,r*.9);ctx.fillRect(cx+r*.56,cy-r*.15,r*.22,r*.9);
-      ctx.fillStyle='#ffe2cc';ctx.beginPath();ctx.ellipse(cx,cy+r*.12,r*.56,r*.6,0,0,7);ctx.fill();ctx.fillStyle='#2b1b10';ctx.beginPath();ctx.arc(cx-r*.22,cy+r*.08,r*.07,0,7);ctx.arc(cx+r*.22,cy+r*.08,r*.07,0,7);ctx.fill();
-      ctx.fillStyle='#ff8fa8';ctx.beginPath();ctx.ellipse(cx-r*.33,cy+r*.3,r*.1,r*.06,0,0,7);ctx.ellipse(cx+r*.33,cy+r*.3,r*.1,r*.06,0,0,7);ctx.fill();ctx.strokeStyle='#c2566e';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(cx,cy+r*.3,r*.12,.2,Math.PI-.2);ctx.stroke();
-      ctx.font=Math.round(r*.7)+'px sans-serif';ctx.textAlign='center';ctx.fillText('👑',cx,cy-r*.75)}
-    else{const c=CHARS[kind==='teddy'?5:ci];ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.clip();if(c.img&&c.img.complete&&c.img.naturalWidth){const im=c.img,k=Math.max(2*r/im.naturalWidth,2*r/im.naturalHeight);ctx.drawImage(im,cx-im.naturalWidth*k/2,cy-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k)}ctx.restore();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke()}
-    ctx.fillStyle='#3a2210';ctx.font=Math.round(w*.17)+'px Jua, sans-serif';ctx.textAlign='center';ctx.fillText(kind==='nuna'?'누나':kind==='teddy'?'테디':CHARS[ci].name,cx,y+h*.83);
-    ctx.fillStyle='rgba(58,34,16,.55)';ctx.font=Math.round(w*.12)+'px Jua, sans-serif';ctx.fillText(kind==='doll'?'인형':'특수',cx,y+h*.95)}
-  function cardBack(x,y,w,h,col){ctx.save();ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=8;ctx.shadowOffsetY=3;ctx.fillStyle=col||'#4a4575';rr(x,y,w,h,10);ctx.fill();ctx.restore();ctx.fillStyle=pat(QUILT);rr(x+4,y+4,w-8,h-8,8);ctx.fill();ctx.fillStyle='#ffd59a';ctx.font=Math.round(w*.4)+'px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('?',x+w/2,y+h*.62)}
-  const kindOf=(sd,i)=>isSp(i)?sd:'doll';
-  function newRound(now){s.used=[false,false,false,false,false];s.oUsed=0;s.q=0;s.sel=-1;s.my=null;s.op=null;s.ph='pick';s.phAt=now;s.tSent=false;s.rw=null;s.hist=[];
-    bigText((s.r+1)+'판 · 나는 '+(side(s.r)==='nuna'?'👑 누나 편':'🐶 테디 편'),true,1600,side(s.r)==='teddy')}
-  function play(i,now){if(s.my!=null||s.used[i])return;s.my=i;s.used[i]=true;s.sel=-1;sendEv({k:'ec',p:s.r,q:s.q,c:isSp(i)?1:0,d:i});beep(520,.08,'triangle',.05)}
-  function resolve(now){const a=isSp(s.my),b=s.op.sp,ms=side(s.r);s.hist.push({my:s.my,op:s.op});let w=null;
-    if(a&&b)w=ms==='teddy'?'me':'op';else if(a)w=ms==='nuna'?'me':'op';else if(b)w=ms==='nuna'?'me':'op';
-    if(!w){s.ph='pick';s.phAt=now;s.q++;s.my=null;s.op=null;s.tSent=false;bubble('me','휴…',.8);return}
-    const winSide=w==='me'?ms:opSide(s.r),pt=PTS[winSide];if(w==='me')s.sc+=pt;else s.osc+=pt;s.rw={w,pt,winSide};s.ph='rend';s.phAt=now;
-    const msg=a&&b?'테디가 누나한테 애교 공격! 누나 녹음':winSide==='nuna'?'누나가 인형을 안아 갔다':'인형이 테디를 혼냈다';
-    s.rmsg=msg;bigText((w==='me'?'승리! +':opName()+' +')+pt,true,2000,w==='op');if(w==='me'){confetti(W/2,H*.4,40);beep(990,.25,'triangle',.08)}else beep(200,.3,'sawtooth',.05)}
-  function botPick(){const h=hand(),n=h.length,sd=opSide(s.r);let p=1/n;if(sd==='nuna')p*=s.q===0?.6:1.15;else p*=s.q===0?.5:1.25;const sp=Math.random()<Math.min(1,p)||n===1;return sp?{sp:true,d:4}:{sp:false,d:DOLL.length?Math.floor(Math.random()*4):0}}
-  return{
-    id:'ecard',name:'누나 vs 테디 카드 심리전',btn:'내기',stat:null,tapPos:true,
-    rules:['한 명은 👑 누나 편, 한 명은 🐶 테디 편! 둘 다 인형 카드 4장 + 특수 카드 1장(누나 또는 테디)을 들고 동시에 한 장씩 몰래 내요.','인형 vs 인형은 비김, 다음 장으로. 👑 누나는 인형을 이기고, 인형은 🐶 테디를 이기고, 🐶 테디는 👑 누나를 이겨요(애교 공격).','누나 편이 이기면 1점, 테디 편이 이기면 3점! 4판 동안 편을 바꿔 가며 해요. 위의 말풍선 버튼으로 상대를 흔들어 보세요.'],
-    init(o){s={o,r:0,sc:0,osc:0,ended:false,endAt:0,oc:{},ot:{},bot:o.bot?{}:null};newRound(o.now)},
-    step(dt,now,inp){if(s.ended)return;const el=(now-s.phAt)/1000;
-      if(!s.o.bot&&s.op==null&&s.oc[s.r+'_'+s.q])s.op=s.oc[s.r+'_'+s.q];
-      if(s.ph==='pick'){
-        if(s.my==null){if(inp.tap){const L=layout(),[tx,ty]=inp.tap;let hit=false;
-            L.cards.forEach(([x,y],i)=>{const yy=y-(s.sel===i?16:0);if(!s.used[i]&&tx>=x&&tx<=x+L.cw&&ty>=yy&&ty<=yy+L.ch){hit=true;if(s.sel===i)play(i,now);else{s.sel=i;beep(600,.04,'square',.03)}}});
-            if(!hit&&!s.tSent)tauntRects().forEach(r=>{if(tx>=r.x&&tx<=r.x+r.w&&ty>=r.y&&ty<=r.y+r.h){s.tSent=true;bubble('me',TAUNT[r.i],2.2);if(s.o.bot){if(Math.random()<.5)setTimeout(()=>{if(s&&s.ph==='pick')bubble('op',TAUNT[Math.floor(Math.random()*TAUNT.length)],2)},700)}else sendEv({k:'et',i:r.i})}})}
-          if(inp.pressed&&s.sel>=0)play(s.sel,now);
-          if(el>TURN){const h=hand(),dolls=h.filter(i=>!isSp(i));play(dolls.length&&Math.random()<.75?dolls[Math.floor(Math.random()*dolls.length)]:h[Math.floor(Math.random()*h.length)],now)}}
-        if(s.o.bot&&s.op==null){if(!s.bot.at)s.bot.at=now+1500+Math.random()*4500;if(now>=s.bot.at){s.bot.at=0;const b=botPick();s.op=b;if(Math.random()<.35)bubble('op',TAUNT[Math.floor(Math.random()*TAUNT.length)],1.8)}}
-        if(s.my!=null&&s.op!=null){s.ph='show';s.phAt=now;beep(300,.1,'sine',.05)}}
-      else if(s.ph==='show'&&el>SHOW)resolve(now);
-      else if(s.ph==='rend'&&el>REND){if(s.r+1>=NRND){s.ended=true;s.endAt=now;return}s.r++;newRound(now)}},
-    onRemote(g){},
-    onEv(e){if(e.k==='ec'){const p=Math.floor(num(e.p,-1)),q=Math.floor(num(e.q,-1));if(p>=0&&q>=0&&q<5)s.oc[p+'_'+q]={sp:!!e.c,d:clamp(Math.floor(num(e.d)),0,4)}}
-      if(e.k==='et')bubble('op',TAUNT[clamp(Math.floor(num(e.i)),0,TAUNT.length-1)]||'',2.2)},
-    botHear(e){},
-    state(){return{r:s.r}},
-    result(now){if(!s.ended||now-s.endAt<300)return null;return s.sc===s.osc?'draw':(s.sc>s.osc?'me':'opp')},
-    summary(){return'점수 나 '+s.sc+'점 · '+opName()+' '+s.osc+'점'},
-    hud(now){const el=(now-s.phAt)/1000;return{t:(s.r+1)+'/'+NRND+'판 · '+(side(s.r)==='nuna'?'👑':'🐶'),c:s.ph==='pick'?(s.my==null?'고르기 '+Math.max(0,Math.ceil(TURN-el))+'초':opName()+' 고르는 중…'):'나 '+s.sc+' : '+s.osc+' '+opName(),cls:s.ph==='pick'&&s.my==null?'it':'go'}},
-    button(){return{label:'내기',off:!(s.ph==='pick'&&s.my==null&&s.sel>=0)}},
-    draw(now){screen();const t=now/1000,ms=side(s.r),os=opSide(s.r),L=layout();
-      const g=ctx.createRadialGradient(W/2,H*.45,40,W/2,H*.45,Math.max(W,H)*.75);g.addColorStop(0,'#3c6b4a');g.addColorStop(1,'#16261b');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-      const TT=180,TB=L.tauntY-50,TH=TB-TT;ctx.strokeStyle='rgba(255,230,170,.25)';ctx.lineWidth=3;ctx.setLineDash([10,8]);rr(W/2-Math.min(W-30,500)/2,TT,Math.min(W-30,500),TH,28);ctx.stroke();ctx.setLineDash([]);
-      // 상대 편 표시 + 손패 뒷면
-      const oc=5-s.q-(s.op&&s.ph!=='pick'?0:0),ocw=Math.min(46,(W-60)/6),och=ocw*1.38,ox0=W/2-(5*ocw+4*8)/2;
-      ctx.fillStyle=os==='nuna'?'#ffb3c8':'#a8d4ff';ctx.font='17px Jua, sans-serif';ctx.textAlign='center';ctx.fillText(opName()+' · '+(os==='nuna'?'👑 누나 편':'🐶 테디 편'),W/2,90);
-      const remain=5-s.hist.length-((s.op!=null)?1:0);for(let i=0;i<5;i++){ctx.globalAlpha=i<remain?1:.15;cardBack(ox0+i*(ocw+8),102,ocw,och,os==='nuna'?'#8a3d5a':'#2f5d8a')}ctx.globalAlpha=1;
-      // 테이블: 이번 장
-      const th=Math.min(TH-70,140),tw=th/1.38,ty=TT+26,txA=W/2-tw-14,txB=W/2+14;
-      ctx.fillStyle='rgba(255,240,210,.7)';ctx.font='14px Jua, sans-serif';ctx.fillText('나',txA+tw/2,ty-8);ctx.fillText(opName(),txB+tw/2,ty-8);
-      const showing=s.ph!=='pick',flip=showing?Math.min(1,(now-s.phAt)/450):0,last=s.ph==='rend'?s.hist[s.hist.length-1]:null;
-      const myC=s.ph==='pick'?s.my:(last?last.my:s.my),opC=s.ph==='pick'?s.op:(last?last.op:s.op);
-      if(myC!=null){if(showing)cardFace(txA,ty,tw,th,kindOf(ms,myC),isSp(myC)?0:DOLL[myC]);else cardBack(txA,ty,tw,th,ms==='nuna'?'#8a3d5a':'#2f5d8a')}else{ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=2;rr(txA,ty,tw,th,10);ctx.stroke()}
-      if(opC!=null){if(showing&&flip>=1)cardFace(txB,ty,tw,th,opC.sp?os:'doll',opC.sp?0:DOLL[opC.d%4]);else{ctx.save();if(showing){ctx.translate(txB+tw/2,0);ctx.scale(Math.max(.05,1-flip),1);ctx.translate(-(txB+tw/2),0)}cardBack(txB,ty,tw,th,os==='nuna'?'#8a3d5a':'#2f5d8a');ctx.restore()}}
-      else{ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=2;rr(txB,ty,tw,th,10);ctx.stroke();if(s.ph==='pick'){ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='13px Jua, sans-serif';ctx.fillText('고민 중'+'.'.repeat(1+Math.floor(t*2)%3),txB+tw/2,ty+th/2)}}
-      if(s.ph==='rend'&&s.rmsg){ctx.fillStyle=s.rw.w==='me'?'#ffd59a':'#ff9ea0';ctx.font='17px Jua, sans-serif';ctx.fillText(s.rmsg,W/2,ty+th+26)}
-      if(s.ph==='show'&&flip>=1){const a=isSp(myC),b=opC.sp;ctx.fillStyle='#ffd59a';ctx.font='18px Jua, sans-serif';ctx.fillText(!a&&!b?'인형끼리 꼭 안고 잠들었다… 비김':'두근두근!',W/2,ty+th+26)}
-      // 지난 장 기록
-      ctx.font='12px Jua, sans-serif';ctx.fillStyle='rgba(255,240,210,.55)';ctx.fillText('비긴 장 '+s.hist.filter(h=>!isSp(h.my)&&!h.op.sp).length+'번 · 남은 카드 '+hand().length+'장',W/2,TB-8);
-      // 내 손패
-      ctx.fillStyle=ms==='nuna'?'#ffb3c8':'#a8d4ff';ctx.font='15px Jua, sans-serif';ctx.fillText('내 카드 · '+(ms==='nuna'?'👑 누나 편 (이기면 1점)':'🐶 테디 편 (이기면 3점)'),W/2,L.y-(s.ph==='pick'&&s.my==null?92:14));
-      if(s.ph==='pick'&&s.my==null){tauntRects().forEach(r=>{ctx.fillStyle=s.tSent?'rgba(255,255,255,.06)':'rgba(255,255,255,.14)';rr(r.x,r.y,r.w,r.h,15);ctx.fill();ctx.fillStyle=s.tSent?'rgba(255,255,255,.3)':'#f6ecdc';ctx.font='13px Jua, sans-serif';ctx.fillText(TAUNT[r.i],r.x+r.w/2,r.y+20)})}
-      L.cards.forEach(([x,y],i)=>{if(s.used[i])return;const lift=s.sel===i?16:0,bob=Math.sin(t*2+i)*1.5;cardFace(x,y-lift+bob,L.cw,L.ch,kindOf(ms,i),isSp(i)?0:DOLL[i],s.sel===i?'#ffd59a':null);if(s.sel===i){ctx.fillStyle='#ffd59a';ctx.font='12px Jua, sans-serif';ctx.fillText('한 번 더 누르면 내기',x+L.cw/2,y-lift-6)}});
-      drawBubble(txA+tw/2,ty+th,C.bub.me,now);drawBubble(W/2,102+och+30,C.bub.op,now);drawParts()}
-  }})();
+
 
 /* ================= 게임 22: 형 방 숨바꼭질 ================= */
 const HideG=(()=>{
@@ -2392,7 +2587,10 @@ const HideG=(()=>{
       for(const f of furn)for(let yy=f.y;yy<f.y+f.h;yy++)for(let xx=f.x;xx<f.x+f.w;xx++)g[yy*GW+xx]=1;const G={w:GW,h:GH,g,furn};const d=gBfs(G,7,GH-3);let ok=true;for(let i=0;i<GW*GH;i++)if(!g[i]&&d[i]<0)ok=false;if(!ok)continue;
       const cand=[];for(let y=1;y<GH-1;y++)for(let x=1;x<GW-1;x++){if(g[y*GW+x])continue;let adj=0;for(const [dx,dy] of DIRS)if(g[(y+dy)*GW+x+dx])adj++;if(adj>=1&&adj<=2&&hyp(x-7,y-(GH-3))>4)cand.push([x,y])}shuffle(cand,r);
       const sp=[];for(const c of cand){if(sp.every(q=>hyp(q[0]-c[0],q[1]-c[1])>=3.2))sp.push(c);if(sp.length>=8)break}if(sp.length<7)continue;
-      const names=shuffle(SPN.slice(),r);G.spots=sp.map(([x,y],i)=>({x:(x+.5)*T,y:(y+.5)*T,e:names[i][0],n:names[i][1]}));return G}
+      const names=shuffle(SPN.slice(),r);G.spots=sp.map(([x,y],i)=>({x:(x+.5)*T,y:(y+.5)*T,e:names[i][0],n:names[i][1]}));
+      const rest=cand.filter(c=>sp.every(q=>hyp(q[0]-c[0],q[1]-c[1])>=2));const far=[];for(const c of rest){if(far.every(q=>hyp(q[0]-c[0],q[1]-c[1])>=5))far.push(c);if(far.length>=4)break}
+      if(far.length<4)continue;const P=([x,y])=>({x:(x+.5)*T,y:(y+.5)*T});G.tun=[[P(far[0]),P(far[3])],[P(far[1]),P(far[2])]];
+      const toys=[];for(let y=2;y<GH-2;y++)for(let x=2;x<GW-2;x++)if(!g[y*GW+x]&&sp.every(q=>hyp(q[0]-x,q[1]-y)>=2)&&far.every(q=>hyp(q[0]-x,q[1]-y)>=2))toys.push([x,y]);shuffle(toys,r);G.toys=toys.slice(0,5).map(P);return G}
     return null}
   const seekerIdx=r=>(r+s.first)%2,amSeek=()=>seekerIdx(s.r)===s.o.me;
   const ph=now=>{const e=(now-s.rs)/1000;if(e<INTRO)return['intro',e];if(e<INTRO+HIDE)return['hide',e-INTRO];if(!s.rdone&&e<INTRO+HIDE+SEEK)return['seek',e-INTRO-HIDE];return['end',e]};
@@ -2404,26 +2602,33 @@ const HideG=(()=>{
   function foundIt(now,who){if(s.rdone)return;const e=Math.max(0,(now-s.rs)/1000-INTRO-HIDE);s.rdone=true;s.doneAt=now;const hi=1-seekerIdx(s.r);s.surv[hi]=Math.min(SEEK,e);
     const meHider=!amSeek();bigText(meHider?'들켰다! '+e.toFixed(1)+'초 버팀':'찾았다! 코츄!',true,1600,meHider);if(!meHider){confetti(W/2,H/2,30);beep(990,.2,'triangle',.07)}else beep(160,.3,'sawtooth',.06);
     if(who==='me'&&!s.o.bot)sendEv({k:'fd',p:s.r,t:Math.round(e*100)/100})}
-  function search(i,now,who){const sp=s.mz.spots[i];s.checked[i]=now;const h=hider();if(h.hid===i){foundIt(now,who);return true}
+  function flushOut(now,who){const h=hider(),sk=seeker();h.hid=-1;h.hidT=0;h.dash=1.6;sk.st=.45;const meH=!amSeek();bigText(meH?'들켰다! 도망쳐!!':'찾았다! 잡아라!',true,1100,meH);beep(meH?300:880,.2,'square',.06);bubble(meH?'me':'op','으악 들켰다!',1);ring(h.x,h.y,'#ffd59a',80)}
+  function search(i,now,who){const sp=s.mz.spots[i];s.checked[i]=now;const h=hider();if(h.hid===i){if(!s.o.bot&&who==='me')sendEv({k:'fl',p:s.r});flushOut(now,who);return true}
     const sk=seeker();sk.st=.7;bubble(who,'없네…',.8);if(who==='me')beep(220,.12,'square',.04);return false}
+  function hTunnel(p,who){if((p.wcd||0)>0)return;for(const [a,b] of s.mz.tun)for(const [u,v] of [[a,b],[b,a]])if(hyp(p.x-u.x,p.y-u.y)<16){p.x=v.x;p.y=v.y;p.kx=p.ky=0;p.wcd=1.5;ring(v.x,v.y,'#b79cff',50);bubble(who,'개구멍 슝!',.8);if(who==='me')beep(620,.1,'sine',.05);return}}
+  function toyStep(p,who,now){s.mz.toys.forEach((q,i)=>{if(hyp(p.x-q.x,p.y-q.y)<16){p.toyT=p.toyT||{};if(p.toyT[i]==null||now-p.toyT[i]>1500){p.toyT[i]=now;squeak(i,now,who==='me'&&!s.o.bot)}}})}
+  function squeak(i,now,send){s.sq[i]=now;beep(1400,.08,'square',.05);if(send)sendEv({k:'sq',i,p:s.r})}
   function nearSpot(p,R){let b=-1,bd=R||SR;s.mz.spots.forEach((q,i)=>{const d=hyp(q.x-p.x,q.y-p.y);if(d<bd){bd=d;b=i}});return b}
   function stepBot(dt,now,P,pe){const b=s.op,bt=s.bot,m=s.me;b.st=Math.max(0,b.st-dt);
     const go=(gx,gy,sp)=>{const gk=Math.floor(gx/T)+','+Math.floor(gy/T);bt.dT-=dt;if(bt.goal!==gk||bt.dT<=0||!bt.dm){bt.goal=gk;bt.dT=.4;bt.dm=gBfs(s.mz,Math.floor(gx/T),Math.floor(gy/T))}
       let tx=gx,ty=gy;if(hyp(gx-b.x,gy-b.y)>T*1.1){const tg=gStep(s.mz,T,b,bt.dm,true,bt.nav,dt);if(tg){tx=tg[0];ty=tg[1]}}botWalk(b,tx,ty,sp*(b.st>0?.2:1),dt);gResolve(s.mz,b,T)};
     if(!amSeek()){// 봇이 술래
-      if(P!=='seek')return;const sp=s.od.speed*SEEKM*.82;const seesMe=m.hid<0&&hyp(m.x-b.x,m.y-b.y)<LIGHT;
-      if(seesMe){go(m.x,m.y,sp);if(hyp(m.x-b.x,m.y-b.y)<PR*2+6)foundIt(now,'op');return}
+      if(P!=='seek')return;const sp=s.od.speed*SEEKM*.82;const seesMe=m.hid<0&&hyp(m.x-b.x,m.y-b.y)<LIGHT;if(seesMe)s.lastSeen={x:m.x,y:m.y,t:now};
+      if(seesMe){go(m.x,m.y,sp);if(hyp(m.x-b.x,m.y-b.y)<PR*2+6&&!s.rdone)foundIt(now,'op');return}
+      if(m.hid<0&&s.lastSeen&&now-s.lastSeen.t<2500){go(s.lastSeen.x,s.lastSeen.y,sp);return}
       if(!bt.order){bt.order=shuffle(s.mz.spots.map((_,i)=>i),Math.random);bt.oi=0}
       let tgt=bt.order[bt.oi%bt.order.length];const rust=m.hid>=0&&m.hidT>RUST;if(rust&&Math.random()<dt*.8)tgt=m.hid;
       const q=s.mz.spots[tgt];go(q.x,q.y,sp);if(hyp(q.x-b.x,q.y-b.y)<SR*.8&&b.st<=0){if(!bt.searchAt)bt.searchAt=now+300+Math.random()*500;if(now>=bt.searchAt){bt.searchAt=0;search(tgt,now,'op');bt.oi++}}}
     else{// 봇이 숨는 쪽
-      if(P==='intro')return;const sp=s.od.speed*.92;if(b.hid>=0){b.hidT+=dt;if(P==='seek'&&b.hidT>RUST+1.5&&hyp(m.x-b.x,m.y-b.y)>260&&Math.random()<dt*.6){b.hid=-1;b.hidT=0;bt.goal=null;bt.pick=null}return}
+      if(P==='intro')return;b.dash=Math.max(0,(b.dash||0)-dt);b.wcd=Math.max(0,(b.wcd||0)-dt);if(P==='seek'&&b.hid<0){hTunnel(b,'op');toyStep(b,'op',now)}
+      if(b.dash>0&&bt.pick==null){let far=-1,fd=-1;s.mz.spots.forEach((q,i)=>{const d=hyp(q.x-m.x,q.y-m.y);if(d>fd){fd=d;far=i}});bt.pick=far}
+      const sp=s.od.speed*.92*(b.dash>0?1.85:1);if(b.hid>=0){b.hidT+=dt;if(P==='seek'&&b.hidT>RUST+1.5&&hyp(m.x-b.x,m.y-b.y)>260&&Math.random()<dt*.6){b.hid=-1;b.hidT=0;bt.goal=null;bt.pick=null}return}
       if(bt.pick==null){const opts=s.mz.spots.map((q,i)=>i).filter(i=>hyp(s.mz.spots[i].x-m.x,s.mz.spots[i].y-m.y)>220);bt.pick=opts.length?opts[Math.floor(Math.random()*opts.length)]:0}
       const q=s.mz.spots[bt.pick];go(q.x,q.y,sp);if(hyp(q.x-b.x,q.y-b.y)<SR*.7){b.hid=bt.pick;b.hidT=0;b.x=q.x;b.y=q.y;bt.pick=null}}}
   return{
     id:'hide',name:'형 방 숨바꼭질',btn:'숨기',stat:null,stick:true,
-    rules:['한 명은 술래, 한 명은 숨는 쪽! 2판 하면서 역할을 바꿔요. 술래는 처음부터 빨라요.','숨는 쪽: 9초 동안 숨을 곳(이불 더미·박스·옷장…) 근처에서 숨기!를 눌러요. 한 곳에 7초 넘게 있으면 부스럭거려서 들킬 수 있어요. 다시 누르면 나와서 옮길 수 있어요.','술래: 불 꺼진 방에서 숨을 곳 앞에서 찾기!를 눌러요. 밖에 있는 상대는 닿기만 해도 잡혀요. 30초 버티면 숨는 쪽 승! 더 오래 버틴 쪽이 이겨요.'],
-    init(o){s={o,first:(o.seed>>>4)&1,r:0,mz:gen(o.seed)||gen(o.seed+1),me:{},op:{ok:o.bot?true:undefined},surv:[null,null],cd:0,d:derive(o.myC),od:derive(o.oppC),ended:false,endAt:0,bot:o.bot?{}:null,lastP:'',fsT:0};newRound(o.now)},
+    rules:['한 명은 술래, 한 명은 숨는 쪽! 2판 하면서 역할을 바꿔요. 술래는 처음부터 빨라요. 술래가 숨은 곳을 찾으면 숨는 쪽이 튀어나와 슝! 빠르게 도망칠 수 있어요. 술래는 닿아야 잡아요.','개구멍(보라·분홍)은 숨는 쪽만 쓰는 순간이동 구멍이에요. 바닥의 🐤 삑삑이를 밟으면 삑! 소리와 위치가 술래에게 보여요.','숨는 쪽: 9초 동안 숨을 곳(이불 더미·박스·옷장…) 근처에서 숨기!를 눌러요. 한 곳에 7초 넘게 있으면 부스럭거려서 들킬 수 있어요. 다시 누르면 나와서 옮길 수 있어요.','술래: 불 꺼진 방에서 숨을 곳 앞에서 찾기!를 눌러요. 밖에 있는 상대는 닿기만 해도 잡혀요. 30초 버티면 숨는 쪽 승! 더 오래 버틴 쪽이 이겨요.'],
+    init(o){s={o,sq:{},first:(o.seed>>>4)&1,r:0,mz:gen(o.seed)||gen(o.seed+1),me:{},op:{ok:o.bot?true:undefined},surv:[null,null],cd:0,d:derive(o.myC),od:derive(o.oppC),ended:false,endAt:0,bot:o.bot?{}:null,lastP:'',fsT:0};newRound(o.now)},
     step(dt,now,inp){if(s.ended)return;const [P,pe]=ph(now),m=s.me,op=s.op;s.cd=Math.max(0,s.cd-dt);m.st=Math.max(0,m.st-dt);
       if(P!==s.lastP){s.lastP=P;if(P==='hide')bigText(amSeek()?'눈 감고 숫자 세는 중…':'빨리 숨어요!',true,1300,!amSeek());if(P==='seek'){bigText(amSeek()?'찾는다!':'술래가 온다!',true,1100,!amSeek());beep(660,.2,'triangle',.06)}
         if(P==='end'&&!s.rdone){s.rdone=true;s.doneAt=now;s.surv[1-seekerIdx(s.r)]=SEEK;bigText(amSeek()?'못 찾았다… 30초 끝':'끝까지 안 들켰다!',true,1600,amSeek())}}
@@ -2431,16 +2636,17 @@ const HideG=(()=>{
         if(!s.o.bot)smooth(op,dt);return}
       const sk=amSeek();
       // 내 이동
-      const canMove=sk?P==='seek':m.hid<0&&P!=='intro';if(canMove){walk(m,inp,s.d.speed*(sk?SEEKM:.95)*(m.st>0?.2:1),dt);gResolve(s.mz,m,T)}
+      m.dash=Math.max(0,(m.dash||0)-dt);m.wcd=Math.max(0,(m.wcd||0)-dt);const canMove=sk?P==='seek':m.hid<0&&P!=='intro';if(canMove){walk(m,inp,s.d.speed*(sk?SEEKM:.95)*(m.dash>0?1.85:1)*(m.st>0?.2:1),dt);gResolve(s.mz,m,T)}
+      if(!sk&&m.hid<0&&P!=='intro')hTunnel(m,'me');if(P==='seek'&&!sk&&m.hid<0)toyStep(m,'me',now);
       if(!sk&&m.hid>=0){m.hidT+=dt;const q=s.mz.spots[m.hid];m.x=q.x;m.y=q.y;if(m.hidT>RUST&&Math.floor(m.hidT*2)!==Math.floor((m.hidT-dt)*2))bubble('me','부스럭…',.5)}
-      if(inp.pressed){if(sk){if(P==='seek'&&m.st<=0){const i=nearSpot(m);if(i>=0){if(!s.o.bot&&op.hid===i){foundIt(now,'me')}else if(s.o.bot&&op.hid===i){foundIt(now,'me')}else search(i,now,'me')}else bubble('me','숨을 곳 앞에서 눌러요',.8)}}
-        else if(P!=='intro'){if(m.hid>=0){m.hid=-1;m.hidT=0;bubble('me','살금살금…',.8)}else{const i=nearSpot(m);if(i>=0&&op.hid!==i){m.hid=i;m.hidT=0;bubble('me','숨었다!',.8);beep(520,.08,'triangle',.05)}else bubble('me','숨을 곳 가까이 가요',.8)}}}
+      if(inp.pressed){if(sk){if(P==='seek'&&m.st<=0){const i=nearSpot(m);if(i>=0)search(i,now,'me');else bubble('me','숨을 곳 앞에서 눌러요',.8)}}
+        else if(P!=='intro'){if(m.hid>=0){m.hid=-1;m.hidT=0;m.dash=.8;bubble('me','슝! 빠져나왔다',.8)}else{const i=nearSpot(m);if(i>=0&&op.hid!==i){m.hid=i;m.hidT=0;bubble('me','숨었다!',.8);beep(520,.08,'triangle',.05)}else bubble('me','숨을 곳 가까이 가요',.8)}}}
       // 술래가 밖에 있는 상대 터치
       if(sk&&P==='seek'&&op.ok!==false&&op.hid<0&&hyp(op.x-m.x,op.y-m.y)<PR*2+6&&!s.rdone)foundIt(now,'me');
       if(sk&&P==='seek'&&op.hid<0){const d=hyp(op.x-m.x,op.y-m.y);if(d>LIGHT&&d<320){s.fsT-=dt;if(s.fsT<=0){s.fsT=.6;P2step(op.x,op.y)}}}
       if(s.bot)stepBot(dt,now,P,pe);else smooth(op,dt)},
     onRemote(g){if(num(g.r,-1)!==s.r)return;remoteTo(s.op,g,0,0,GW*T,GH*T);if(hyp(s.op.tx-s.op.x,s.op.ty-s.op.y)>3*T){s.op.x=s.op.tx;s.op.y=s.op.ty}s.op.hid=Math.floor(num(g.h,-1));s.op.hidT=num(g.ht)},
-    onEv(e,now){if(e.k==='fd'&&num(e.p,-1)===s.r&&!s.rdone)foundIt(now||performance.now(),'op')},
+    onEv(e,now){now=now||performance.now();if(num(e.p,-1)!==s.r)return;if(e.k==='fd'&&!s.rdone)foundIt(now,'op');if(e.k==='fl'&&!amSeek()&&!s.rdone)flushOut(now,'op');if(e.k==='sq'){const i=Math.floor(num(e.i,-1));if(i>=0&&i<s.mz.toys.length)s.sq[i]=now}},
     botHear(e){},
     state(){return{x:Math.round(s.me.x),y:Math.round(s.me.y),h:s.me.hid,ht:Math.round((s.me.hidT||0)*10)/10,r:s.r}},
     result(now){if(!s.ended||now-s.endAt<300)return null;const a=num(s.surv[s.o.me]),b=num(s.surv[1-s.o.me]);return Math.abs(a-b)<.05?'draw':(a>b?'me':'opp')},
@@ -2453,6 +2659,8 @@ const HideG=(()=>{
       ctx.fillStyle=pat(PLANK);ctx.fillRect(0,0,wW,wH);ctx.fillStyle=pat(WALLP);for(let y=0;y<GH;y++)for(let x=0;x<GW;x++)if(x===0||y===0||x===GW-1||y===GH-1)ctx.fillRect(x*T,y*T,T,T);
       const fc={desk:['#b27c49','#8a5a30'],box:['#d97257','#a8513b'],shelf:['#6f4526','#4e2f19'],bed:['#5a5a9a','#3f3f72'],sofa:['#7a8fd0','#55669f']};
       for(const f of s.mz.furn){const [c1,c2]=fc[f.ty];ctx.fillStyle='rgba(0,0,0,.35)';rr(f.x*T+2,f.y*T+6,f.w*T-4,f.h*T,8);ctx.fill();ctx.fillStyle=c2;rr(f.x*T+2,f.y*T+2,f.w*T-4,f.h*T-4,8);ctx.fill();ctx.fillStyle=c1;rr(f.x*T+2,f.y*T+2,f.w*T-4,f.h*T-12,8);ctx.fill();if(f.ty==='bed'){ctx.fillStyle=pat(DOTS);rr(f.x*T+6,f.y*T+6,f.w*T-12,f.h*T-18,6);ctx.fill()}}
+      s.mz.tun.forEach((pr,pi)=>pr.forEach(u=>{const c=pi?'#ff9ad5':'#b79cff';ctx.fillStyle='rgba(0,0,0,.55)';ctx.beginPath();ctx.ellipse(u.x,u.y,15,10,0,0,7);ctx.fill();ctx.strokeStyle=c;ctx.lineWidth=3;ctx.stroke();ctx.fillStyle=c;ctx.font='10px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('개구멍',u.x,u.y+22)}));
+      s.mz.toys.forEach(q=>{ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('🐤',q.x,q.y+6)});
       const hid=sk?op:m;s.mz.spots.forEach((q,i)=>{const occ=hid.hid===i,rust=occ&&hid.hidT>RUST&&P==='seek',chk=s.checked[i]&&now-s.checked[i]<3000;
         ctx.save();ctx.translate(q.x,q.y);if(rust)ctx.rotate(Math.sin(t*30)*.18);ctx.fillStyle='rgba(255,213,154,.12)';ctx.beginPath();ctx.arc(0,0,22,0,7);ctx.fill();ctx.font='30px sans-serif';ctx.textAlign='center';ctx.fillText(q.e,0,11);ctx.restore();
         ctx.font='11px Jua, sans-serif';ctx.textAlign='center';ctx.fillStyle='rgba(246,236,220,.75)';ctx.fillText(q.n,q.x,q.y+34);
@@ -2469,6 +2677,7 @@ const HideG=(()=>{
         if(P==='seek'){dg.globalCompositeOperation='destination-out';const [x,y]=toS(m.x,m.y),R=LIGHT*z*dpr;const g=dg.createRadialGradient(x*dpr,y*dpr,R*.35,x*dpr,y*dpr,R);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');dg.fillStyle=g;dg.beginPath();dg.arc(x*dpr,y*dpr,R,0,7);dg.fill()}
         ctx.drawImage(dark,0,0,W,H);
         if(P==='seek'){cam(cx,cy,z);s.mz.spots.forEach((q,i)=>{ctx.globalAlpha=.55;ctx.font='22px sans-serif';ctx.textAlign='center';ctx.fillText(q.e,q.x,q.y+8);ctx.globalAlpha=1;const occ=op.hid===i&&op.hidT>RUST;if(occ){ctx.save();ctx.translate(q.x,q.y);ctx.rotate(Math.sin(t*30)*.2);ctx.font='26px sans-serif';ctx.fillText(q.e,0,9);ctx.restore();ctx.fillStyle='#ffd59a';ctx.font='13px Jua, sans-serif';ctx.fillText('부스럭',q.x,q.y-24)}});
+          s.mz.toys.forEach((q,i)=>{const a=s.sq[i]?1-(now-s.sq[i])/1500:0;if(a>0){ctx.strokeStyle='rgba(255,236,120,'+a.toFixed(2)+')';ctx.lineWidth=4;ctx.beginPath();ctx.arc(q.x,q.y,(1-a)*60+10,0,7);ctx.stroke();ctx.fillStyle='rgba(255,236,120,'+a.toFixed(2)+')';ctx.font='14px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('삑!',q.x,q.y-20)}});
           for(const p of C.parts)if(p.t==='step'){const a=p.life/p.max;ctx.strokeStyle='rgba(255,255,255,'+(a*.6).toFixed(2)+')';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,(1-a)*26+4,0,7);ctx.stroke()}
           drawToken(m.x,m.y,s.o.myC,{label:'나',tag:true,t,bob:m.bob,tilt:m.tilt});drawBubble(m.x,m.y,C.bub.me,now);screen()}
         else{ctx.fillStyle='#ffd59a';ctx.font='26px Jua, sans-serif';ctx.textAlign='center';ctx.fillText(P==='hide'?'눈 감고 세는 중… '+Math.ceil(HIDE-pe):'',W/2,H/2);ctx.font='60px sans-serif';ctx.fillText(P==='hide'?'🙈':'',W/2,H/2-60)}}
