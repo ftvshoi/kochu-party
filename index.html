@@ -165,7 +165,7 @@ input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--lamp
   <p class="eyebrow">밤마다 둘이서</p>
   <h1>코츄 밤 파티</h1>
   <ul class="rules">
-    <li>매 판 미니게임 21개 중 하나가 나와요. 진 사람이 다음 게임을 골라요.</li>
+    <li>매 판 미니게임 22개 중 하나가 나와요. 진 사람이 다음 게임을 골라요.</li>
     <li>이기면 도토리 1개. 먼저 5개 모으면 최종 우승이에요.</li>
     <li>왼손은 화면을 밀어서 이동, 오른손은 큰 버튼 하나만 써요.</li>
   </ul>
@@ -2262,7 +2262,90 @@ const BluffG=(()=>{
       if(s.ph!=='rev')drawBubble(W/2,H-250,C.bub.me,now);drawParts()}
   }})();
 
-const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG,MemoryG,DanceG,BluffG];
+/* ================= 게임 22: 누나 vs 테디 카드 심리전 ================= */
+const ECardG=(()=>{
+  const NRND=4,TURN=15,SHOW=1.7,REND=2.8,PTS={nuna:1,teddy:3};let s=null;
+  const DOLL=[0,1,3,4],TAUNT=['이번엔 인형이야','진짜 나간다…','눈 보면 알지?','ㅋㅋㅋ 떨려?','믿어봐 😇','지금이다!'];
+  const side=r=>((r+s.o.me)%2===0)?'nuna':'teddy',opSide=r=>side(r)==='nuna'?'teddy':'nuna';
+  const SP={nuna:'누나',teddy:'테디'};
+  function hand(){const h=[];for(let i=0;i<5;i++)if(!s.used[i])h.push(i);return h}
+  const isSp=i=>i===4;
+  function layout(){const n=5,cw=Math.min(78,(W-40)/5.4),ch=cw*1.38,y=H-150-ch-46,gap=cw*.18,x0=W/2-(n*cw+(n-1)*gap)/2;return{cw,ch,y,cards:Array.from({length:n},(_,i)=>[x0+i*(cw+gap),y]),tauntY:y-46}}
+  function tauntRects(){const L=layout(),w=Math.min(W-24,520),x0=(W-w)/2,bw=(w-10)/3,out=[];TAUNT.forEach((t,i)=>{if(i<3)out.push({i,x:x0+i*(bw+5),y:L.tauntY-36,w:bw,h:30});else out.push({i,x:x0+(i-3)*(bw+5),y:L.tauntY,w:bw,h:30})});return out}
+  function cardFace(x,y,w,h,kind,ci,glow){ctx.save();ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=10;ctx.shadowOffsetY=4;ctx.fillStyle=kind==='nuna'?'#ffe3ea':kind==='teddy'?'#e8f4ff':'#fbf1dd';rr(x,y,w,h,10);ctx.fill();ctx.restore();
+    ctx.strokeStyle=glow||(kind==='nuna'?'#ff7aa2':kind==='teddy'?'#6fb6ff':'#d7b98a');ctx.lineWidth=glow?4:2.5;rr(x,y,w,h,10);ctx.stroke();
+    const cx=x+w/2,cy=y+h*.42,r=w*.34;
+    if(kind==='nuna'){ctx.fillStyle='#ffd0db';ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();ctx.fillStyle='#3a2414';ctx.beginPath();ctx.arc(cx,cy-r*.15,r*.78,Math.PI,0);ctx.fill();ctx.fillRect(cx-r*.78,cy-r*.15,r*.22,r*.9);ctx.fillRect(cx+r*.56,cy-r*.15,r*.22,r*.9);
+      ctx.fillStyle='#ffe2cc';ctx.beginPath();ctx.ellipse(cx,cy+r*.12,r*.56,r*.6,0,0,7);ctx.fill();ctx.fillStyle='#2b1b10';ctx.beginPath();ctx.arc(cx-r*.22,cy+r*.08,r*.07,0,7);ctx.arc(cx+r*.22,cy+r*.08,r*.07,0,7);ctx.fill();
+      ctx.fillStyle='#ff8fa8';ctx.beginPath();ctx.ellipse(cx-r*.33,cy+r*.3,r*.1,r*.06,0,0,7);ctx.ellipse(cx+r*.33,cy+r*.3,r*.1,r*.06,0,0,7);ctx.fill();ctx.strokeStyle='#c2566e';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(cx,cy+r*.3,r*.12,.2,Math.PI-.2);ctx.stroke();
+      ctx.font=Math.round(r*.7)+'px sans-serif';ctx.textAlign='center';ctx.fillText('👑',cx,cy-r*.75)}
+    else{const c=CHARS[kind==='teddy'?5:ci];ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.clip();if(c.img&&c.img.complete&&c.img.naturalWidth){const im=c.img,k=Math.max(2*r/im.naturalWidth,2*r/im.naturalHeight);ctx.drawImage(im,cx-im.naturalWidth*k/2,cy-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k)}ctx.restore();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke()}
+    ctx.fillStyle='#3a2210';ctx.font=Math.round(w*.17)+'px Jua, sans-serif';ctx.textAlign='center';ctx.fillText(kind==='nuna'?'누나':kind==='teddy'?'테디':CHARS[ci].name,cx,y+h*.83);
+    ctx.fillStyle='rgba(58,34,16,.55)';ctx.font=Math.round(w*.12)+'px Jua, sans-serif';ctx.fillText(kind==='doll'?'인형':'특수',cx,y+h*.95)}
+  function cardBack(x,y,w,h,col){ctx.save();ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=8;ctx.shadowOffsetY=3;ctx.fillStyle=col||'#4a4575';rr(x,y,w,h,10);ctx.fill();ctx.restore();ctx.fillStyle=pat(QUILT);rr(x+4,y+4,w-8,h-8,8);ctx.fill();ctx.fillStyle='#ffd59a';ctx.font=Math.round(w*.4)+'px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('?',x+w/2,y+h*.62)}
+  const kindOf=(sd,i)=>isSp(i)?sd:'doll';
+  function newRound(now){s.used=[false,false,false,false,false];s.oUsed=0;s.q=0;s.sel=-1;s.my=null;s.op=null;s.ph='pick';s.phAt=now;s.tSent=false;s.rw=null;s.hist=[];
+    bigText((s.r+1)+'판 · 나는 '+(side(s.r)==='nuna'?'👑 누나 편':'🐶 테디 편'),true,1600,side(s.r)==='teddy')}
+  function play(i,now){if(s.my!=null||s.used[i])return;s.my=i;s.used[i]=true;s.sel=-1;sendEv({k:'ec',p:s.r,q:s.q,c:isSp(i)?1:0,d:i});beep(520,.08,'triangle',.05)}
+  function resolve(now){const a=isSp(s.my),b=s.op.sp,ms=side(s.r);s.hist.push({my:s.my,op:s.op});let w=null;
+    if(a&&b)w=ms==='teddy'?'me':'op';else if(a)w=ms==='nuna'?'me':'op';else if(b)w=ms==='nuna'?'me':'op';
+    if(!w){s.ph='pick';s.phAt=now;s.q++;s.my=null;s.op=null;s.tSent=false;bubble('me','휴…',.8);return}
+    const winSide=w==='me'?ms:opSide(s.r),pt=PTS[winSide];if(w==='me')s.sc+=pt;else s.osc+=pt;s.rw={w,pt,winSide};s.ph='rend';s.phAt=now;
+    const msg=a&&b?'테디가 누나한테 애교 공격! 누나 녹음':winSide==='nuna'?'누나가 인형을 안아 갔다':'인형이 테디를 혼냈다';
+    s.rmsg=msg;bigText((w==='me'?'승리! +':opName()+' +')+pt,true,2000,w==='op');if(w==='me'){confetti(W/2,H*.4,40);beep(990,.25,'triangle',.08)}else beep(200,.3,'sawtooth',.05)}
+  function botPick(){const h=hand(),n=h.length,sd=opSide(s.r);let p=1/n;if(sd==='nuna')p*=s.q===0?.6:1.15;else p*=s.q===0?.5:1.25;const sp=Math.random()<Math.min(1,p)||n===1;return sp?{sp:true,d:4}:{sp:false,d:DOLL.length?Math.floor(Math.random()*4):0}}
+  return{
+    id:'ecard',name:'누나 vs 테디 카드 심리전',btn:'내기',stat:null,tapPos:true,
+    rules:['한 명은 👑 누나 편, 한 명은 🐶 테디 편! 둘 다 인형 카드 4장 + 특수 카드 1장(누나 또는 테디)을 들고 동시에 한 장씩 몰래 내요.','인형 vs 인형은 비김, 다음 장으로. 👑 누나는 인형을 이기고, 인형은 🐶 테디를 이기고, 🐶 테디는 👑 누나를 이겨요(애교 공격).','누나 편이 이기면 1점, 테디 편이 이기면 3점! 4판 동안 편을 바꿔 가며 해요. 위의 말풍선 버튼으로 상대를 흔들어 보세요.'],
+    init(o){s={o,r:0,sc:0,osc:0,ended:false,endAt:0,oc:{},ot:{},bot:o.bot?{}:null};newRound(o.now)},
+    step(dt,now,inp){if(s.ended)return;const el=(now-s.phAt)/1000;
+      if(!s.o.bot&&s.op==null&&s.oc[s.r+'_'+s.q])s.op=s.oc[s.r+'_'+s.q];
+      if(s.ph==='pick'){
+        if(s.my==null){if(inp.tap){const L=layout(),[tx,ty]=inp.tap;let hit=false;
+            L.cards.forEach(([x,y],i)=>{const yy=y-(s.sel===i?16:0);if(!s.used[i]&&tx>=x&&tx<=x+L.cw&&ty>=yy&&ty<=yy+L.ch){hit=true;if(s.sel===i)play(i,now);else{s.sel=i;beep(600,.04,'square',.03)}}});
+            if(!hit&&!s.tSent)tauntRects().forEach(r=>{if(tx>=r.x&&tx<=r.x+r.w&&ty>=r.y&&ty<=r.y+r.h){s.tSent=true;bubble('me',TAUNT[r.i],2.2);if(s.o.bot){if(Math.random()<.5)setTimeout(()=>{if(s&&s.ph==='pick')bubble('op',TAUNT[Math.floor(Math.random()*TAUNT.length)],2)},700)}else sendEv({k:'et',i:r.i})}})}
+          if(inp.pressed&&s.sel>=0)play(s.sel,now);
+          if(el>TURN){const h=hand(),dolls=h.filter(i=>!isSp(i));play(dolls.length&&Math.random()<.75?dolls[Math.floor(Math.random()*dolls.length)]:h[Math.floor(Math.random()*h.length)],now)}}
+        if(s.o.bot&&s.op==null){if(!s.bot.at)s.bot.at=now+1500+Math.random()*4500;if(now>=s.bot.at){s.bot.at=0;const b=botPick();s.op=b;if(Math.random()<.35)bubble('op',TAUNT[Math.floor(Math.random()*TAUNT.length)],1.8)}}
+        if(s.my!=null&&s.op!=null){s.ph='show';s.phAt=now;beep(300,.1,'sine',.05)}}
+      else if(s.ph==='show'&&el>SHOW)resolve(now);
+      else if(s.ph==='rend'&&el>REND){if(s.r+1>=NRND){s.ended=true;s.endAt=now;return}s.r++;newRound(now)}},
+    onRemote(g){},
+    onEv(e){if(e.k==='ec'){const p=Math.floor(num(e.p,-1)),q=Math.floor(num(e.q,-1));if(p>=0&&q>=0&&q<5)s.oc[p+'_'+q]={sp:!!e.c,d:clamp(Math.floor(num(e.d)),0,4)}}
+      if(e.k==='et')bubble('op',TAUNT[clamp(Math.floor(num(e.i)),0,TAUNT.length-1)]||'',2.2)},
+    botHear(e){},
+    state(){return{r:s.r}},
+    result(now){if(!s.ended||now-s.endAt<300)return null;return s.sc===s.osc?'draw':(s.sc>s.osc?'me':'opp')},
+    summary(){return'점수 나 '+s.sc+'점 · '+opName()+' '+s.osc+'점'},
+    hud(now){const el=(now-s.phAt)/1000;return{t:(s.r+1)+'/'+NRND+'판 · '+(side(s.r)==='nuna'?'👑':'🐶'),c:s.ph==='pick'?(s.my==null?'고르기 '+Math.max(0,Math.ceil(TURN-el))+'초':opName()+' 고르는 중…'):'나 '+s.sc+' : '+s.osc+' '+opName(),cls:s.ph==='pick'&&s.my==null?'it':'go'}},
+    button(){return{label:'내기',off:!(s.ph==='pick'&&s.my==null&&s.sel>=0)}},
+    draw(now){screen();const t=now/1000,ms=side(s.r),os=opSide(s.r),L=layout();
+      const g=ctx.createRadialGradient(W/2,H*.45,40,W/2,H*.45,Math.max(W,H)*.75);g.addColorStop(0,'#3c6b4a');g.addColorStop(1,'#16261b');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+      const TT=180,TB=L.tauntY-50,TH=TB-TT;ctx.strokeStyle='rgba(255,230,170,.25)';ctx.lineWidth=3;ctx.setLineDash([10,8]);rr(W/2-Math.min(W-30,500)/2,TT,Math.min(W-30,500),TH,28);ctx.stroke();ctx.setLineDash([]);
+      // 상대 편 표시 + 손패 뒷면
+      const oc=5-s.q-(s.op&&s.ph!=='pick'?0:0),ocw=Math.min(46,(W-60)/6),och=ocw*1.38,ox0=W/2-(5*ocw+4*8)/2;
+      ctx.fillStyle=os==='nuna'?'#ffb3c8':'#a8d4ff';ctx.font='17px Jua, sans-serif';ctx.textAlign='center';ctx.fillText(opName()+' · '+(os==='nuna'?'👑 누나 편':'🐶 테디 편'),W/2,90);
+      const remain=5-s.hist.length-((s.op!=null)?1:0);for(let i=0;i<5;i++){ctx.globalAlpha=i<remain?1:.15;cardBack(ox0+i*(ocw+8),102,ocw,och,os==='nuna'?'#8a3d5a':'#2f5d8a')}ctx.globalAlpha=1;
+      // 테이블: 이번 장
+      const th=Math.min(TH-70,140),tw=th/1.38,ty=TT+26,txA=W/2-tw-14,txB=W/2+14;
+      ctx.fillStyle='rgba(255,240,210,.7)';ctx.font='14px Jua, sans-serif';ctx.fillText('나',txA+tw/2,ty-8);ctx.fillText(opName(),txB+tw/2,ty-8);
+      const showing=s.ph!=='pick',flip=showing?Math.min(1,(now-s.phAt)/450):0,last=s.ph==='rend'?s.hist[s.hist.length-1]:null;
+      const myC=s.ph==='pick'?s.my:(last?last.my:s.my),opC=s.ph==='pick'?s.op:(last?last.op:s.op);
+      if(myC!=null){if(showing)cardFace(txA,ty,tw,th,kindOf(ms,myC),isSp(myC)?0:DOLL[myC]);else cardBack(txA,ty,tw,th,ms==='nuna'?'#8a3d5a':'#2f5d8a')}else{ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=2;rr(txA,ty,tw,th,10);ctx.stroke()}
+      if(opC!=null){if(showing&&flip>=1)cardFace(txB,ty,tw,th,opC.sp?os:'doll',opC.sp?0:DOLL[opC.d%4]);else{ctx.save();if(showing){ctx.translate(txB+tw/2,0);ctx.scale(Math.max(.05,1-flip),1);ctx.translate(-(txB+tw/2),0)}cardBack(txB,ty,tw,th,os==='nuna'?'#8a3d5a':'#2f5d8a');ctx.restore()}}
+      else{ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=2;rr(txB,ty,tw,th,10);ctx.stroke();if(s.ph==='pick'){ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='13px Jua, sans-serif';ctx.fillText('고민 중'+'.'.repeat(1+Math.floor(t*2)%3),txB+tw/2,ty+th/2)}}
+      if(s.ph==='rend'&&s.rmsg){ctx.fillStyle=s.rw.w==='me'?'#ffd59a':'#ff9ea0';ctx.font='17px Jua, sans-serif';ctx.fillText(s.rmsg,W/2,ty+th+26)}
+      if(s.ph==='show'&&flip>=1){const a=isSp(myC),b=opC.sp;ctx.fillStyle='#ffd59a';ctx.font='18px Jua, sans-serif';ctx.fillText(!a&&!b?'인형끼리 꼭 안고 잠들었다… 비김':'두근두근!',W/2,ty+th+26)}
+      // 지난 장 기록
+      ctx.font='12px Jua, sans-serif';ctx.fillStyle='rgba(255,240,210,.55)';ctx.fillText('비긴 장 '+s.hist.filter(h=>!isSp(h.my)&&!h.op.sp).length+'번 · 남은 카드 '+hand().length+'장',W/2,TB-8);
+      // 내 손패
+      ctx.fillStyle=ms==='nuna'?'#ffb3c8':'#a8d4ff';ctx.font='15px Jua, sans-serif';ctx.fillText('내 카드 · '+(ms==='nuna'?'👑 누나 편 (이기면 1점)':'🐶 테디 편 (이기면 3점)'),W/2,L.y-(s.ph==='pick'&&s.my==null?92:14));
+      if(s.ph==='pick'&&s.my==null){tauntRects().forEach(r=>{ctx.fillStyle=s.tSent?'rgba(255,255,255,.06)':'rgba(255,255,255,.14)';rr(r.x,r.y,r.w,r.h,15);ctx.fill();ctx.fillStyle=s.tSent?'rgba(255,255,255,.3)':'#f6ecdc';ctx.font='13px Jua, sans-serif';ctx.fillText(TAUNT[r.i],r.x+r.w/2,r.y+20)})}
+      L.cards.forEach(([x,y],i)=>{if(s.used[i])return;const lift=s.sel===i?16:0,bob=Math.sin(t*2+i)*1.5;cardFace(x,y-lift+bob,L.cw,L.ch,kindOf(ms,i),isSp(i)?0:DOLL[i],s.sel===i?'#ffd59a':null);if(s.sel===i){ctx.fillStyle='#ffd59a';ctx.font='12px Jua, sans-serif';ctx.fillText('한 번 더 누르면 내기',x+L.cw/2,y-lift-6)}});
+      drawBubble(txA+tw/2,ty+th,C.bub.me,now);drawBubble(W/2,102+och+30,C.bub.op,now);drawParts()}
+  }})();
+
+const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG,MemoryG,DanceG,BluffG,ECardG];
 
 /* ================= 입력 ================= */
 const In={mx:0,my:0,mag:0,pressed:false,held:false};const J={active:false,id:-1,ox:0,oy:0,sx:0,sy:0,dx:0,dy:0,mag:0};const K={};
