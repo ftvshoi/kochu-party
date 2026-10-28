@@ -165,7 +165,7 @@ input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--lamp
   <p class="eyebrow">밤마다 둘이서</p>
   <h1>코츄 밤 파티</h1>
   <ul class="rules">
-    <li>매 판 미니게임 20개 중 하나가 나와요. 진 사람이 다음 게임을 골라요.</li>
+    <li>매 판 미니게임 21개 중 하나가 나와요. 진 사람이 다음 게임을 골라요.</li>
     <li>이기면 도토리 1개. 먼저 5개 모으면 최종 우승이에요.</li>
     <li>왼손은 화면을 밀어서 이동, 오른손은 큰 버튼 하나만 써요.</li>
   </ul>
@@ -2074,7 +2074,88 @@ const DanceG=(()=>{
       drawBubble(W/2,H-260,C.bub.me,now);drawParts()}
   }})();
 
-const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG,MemoryG,DanceG];
+/* ================= 게임 21: 진짜 사랑이 심리전 ================= */
+const BluffG=(()=>{
+  const N=5,NR=3,MAXR=5,SET=25,GUESS=15,REV=4.2;let s=null;
+  const TOOLS=[{k:'real',ic:'👑',n:'진짜'},{k:'sign',ic:'🪧',n:'내가 진짜'},{k:'acorn',ic:'🌰',n:'도토리'},{k:'box',ic:'📦',n:'박스'}];
+  function cells(top,bot){const h=bot-top,r1=top+h*.3,r2=top+h*.76,cw=(W-24)/3;return[[12+cw*.5,r1],[12+cw*1.5,r1],[12+cw*2.5,r1],[W/2-cw*.55,r2],[W/2+cw*.55,r2]]}
+  function trayRects(){const y=H-196,w=(W-24-18)/4;return TOOLS.map((t,i)=>({i,x:12+i*(w+6),y,w,h:52}))}
+  const fullCells=()=>cells(110,H-230);
+  function blank(){return{real:-1,sign:-1,acorn:-1,box:-1}}
+  function drawAcorn(x,y,sc){ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);ctx.fillStyle='#c4863f';ctx.beginPath();ctx.ellipse(0,3,7,9,0,0,7);ctx.fill();ctx.fillStyle='#6b4a2a';ctx.beginPath();ctx.ellipse(0,-3,8.5,5,0,Math.PI,0);ctx.fill();ctx.fillRect(-1,-11,2,4);ctx.restore()}
+  function drawDoll(x,y,sc,o,t,i,mark){const r=(PR+1)*sc*1.9;
+    ctx.fillStyle='rgba(255,255,255,.05)';ctx.beginPath();ctx.arc(x,y,r+14*sc,0,7);ctx.fill();
+    if(mark&&mark.realGlow){ctx.strokeStyle='#ffd59a';ctx.setLineDash([6,5]);ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,r+10*sc,0,7);ctx.stroke();ctx.setLineDash([])}
+    drawToken(x,y,0,{scale:sc*1.9,bob:t*3+i,tilt:Math.sin(t*1.3+i)*.05});
+    if(o.box===i){ctx.fillStyle='#c79a5b';ctx.fillRect(x-r*1.15,y-r*.1,r*2.3,r*1.25);ctx.fillStyle='#a87b41';ctx.beginPath();ctx.moveTo(x-r*1.15,y-r*.1);ctx.lineTo(x-r*1.45,y-r*.55);ctx.lineTo(x-r*.2,y-r*.55);ctx.lineTo(x,y-r*.1);ctx.fill();ctx.beginPath();ctx.moveTo(x+r*1.15,y-r*.1);ctx.lineTo(x+r*1.45,y-r*.55);ctx.lineTo(x+r*.2,y-r*.55);ctx.lineTo(x,y-r*.1);ctx.fill();
+      ctx.strokeStyle='rgba(80,50,20,.5)';ctx.lineWidth=2;ctx.strokeRect(x-r*1.15,y-r*.1,r*2.3,r*1.25);ctx.fillStyle='rgba(60,35,10,.55)';ctx.font=Math.round(11*sc)+'px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('취급주의',x,y+r*.6)}
+    if(o.sign===i){const sx=x+r*.95,sy=y-r*1.05;ctx.fillStyle='#7a5532';ctx.fillRect(sx-2,sy,4,r*1.1);ctx.fillStyle='#f3dcb0';rr(sx-30*sc,sy-24*sc,60*sc,24*sc,5);ctx.fill();ctx.strokeStyle='#7a5532';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#5a3418';ctx.font=Math.round(12*sc)+'px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('내가 진짜',sx,sy-8*sc)}
+    if(o.acorn===i)drawAcorn(x-r*.95,y+r*.55,1.6*sc);
+    ctx.fillStyle='rgba(246,236,220,.75)';ctx.font=Math.round(14*sc)+'px Jua, sans-serif';ctx.textAlign='center';ctx.fillText((i+1)+'번',x,y+r+24*sc);
+    if(mark&&mark.crown){ctx.font=Math.round(30*sc)+'px sans-serif';ctx.fillText('👑',x,y-r-6*sc)}
+    if(mark&&mark.pin){ctx.strokeStyle=mark.pin;ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,r+8*sc,0,7);ctx.stroke();ctx.fillStyle=mark.pin;ctx.font=Math.round(13*sc)+'px Jua, sans-serif';ctx.fillText(mark.pinT||'',x,y+r+(mark.crown?40:40)*sc)}}
+  function autoFill(o){const r=Math.random;if(o.real<0)o.real=Math.floor(r()*N);['sign','acorn','box'].forEach(k=>{if(o[k]<0)o[k]=Math.floor(r()*N)})}
+  function botSetup(){const o=blank();o.real=Math.floor(Math.random()*N);const style=Math.random();
+    ['sign','acorn','box'].forEach(k=>{o[k]=(style<.3&&Math.random()<.6)?o.real:Math.floor(Math.random()*N)});return o}
+  function botGuess(o){const w=Array(N).fill(1);['sign','acorn','box'].forEach(k=>{if(o[k]>=0)w[o[k]]+=.5});w.forEach((v,i)=>{w[i]=v*(.6+Math.random()*.8)});return w.indexOf(Math.max(...w))}
+  function newRound(now){s.ph='set';s.phAt=now;s.mine=blank();s.sel=0;s.opSet=null;s.myG=-1;s.opG=-1;s.sent=false;s.gSent=false;s.res=null;
+    if(s.o.bot){s.opSet=botSetup();s.botGAt=null}}
+  function sendSetup(now){if(s.sent)return;autoFill(s.mine);s.sent=true;sendEv({k:'bs',p:s.ri,a:[s.mine.real,s.mine.sign,s.mine.acorn,s.mine.box]});beep(880,.15,'triangle',.06)}
+  function settle(now){const okMe=s.myG===s.opSet.real,okOp=s.opG===s.mine.real;if(okMe)s.sc++;if(okOp)s.osc++;s.res={okMe,okOp};s.ph='rev';s.phAt=now;
+    bigText(okMe&&okOp?'둘 다 맞혔다!':okMe?'진짜 찾았다! +1':okOp?opName()+'가 내 진짜를 찾았어요':'둘 다 속았다!',true,1600,okOp&&!okMe);if(okMe){confetti(W/2,H*.3,26);beep(990,.2,'triangle',.07)}}
+  return{
+    id:'bluff',name:'진짜 사랑이 심리전',btn:'준비 완료',stat:null,tapPos:true,
+    rules:['사랑이가 5마리! 먼저 👑 진짜 사랑이 하나를 몰래 골라요. 상대는 몰라요.','위장 도구 3개(🪧 내가 진짜 팻말, 🌰 도토리, 📦 박스)를 아무 사랑이에게나 붙여요. 사실 도구는 아무 효과 없어요. 속이기용이에요!','그다음 상대 사랑이 5마리를 보고 상대의 진짜가 누군지 맞혀요. 맞히면 1점, 3판 해서 점수 많은 쪽이 승리!'],
+    init(o){s={o,ri:0,sc:0,osc:0,ended:false,endAt:0,os:{},og:{}};newRound(o.now)},
+    step(dt,now,inp){if(s.ended)return;const el=(now-s.phAt)/1000;if(!s.o.bot){if(!s.opSet&&s.os[s.ri])s.opSet=s.os[s.ri];if(s.opG<0&&s.og[s.ri]!=null&&s.ph==='guess')s.opG=s.og[s.ri]}
+      if(s.ph==='set'){
+        if(!s.sent){if(inp.tap){const [tx,ty]=inp.tap;let hit=false;
+            trayRects().forEach(r=>{if(tx>=r.x&&tx<=r.x+r.w&&ty>=r.y&&ty<=r.y+r.h){s.sel=r.i;hit=true;beep(600,.04,'square',.03)}});
+            if(!hit)fullCells().forEach(([cx,cy],i)=>{if(hyp(tx-cx,ty-cy)<62){const k=TOOLS[s.sel].k;s.mine[k]=i;beep(700+s.sel*90,.07,'triangle',.05);
+              const nx=TOOLS.findIndex(t=>s.mine[t.k]<0);if(nx>=0)s.sel=nx}})}
+          if(inp.pressed&&s.mine.real>=0)sendSetup(now);
+          if(el>SET)sendSetup(now)}
+        if(s.sent&&s.opSet){s.ph='guess';s.phAt=now;bigText('상대의 진짜를 찾아라!',true,1100)}}
+      else if(s.ph==='guess'){
+        if(s.myG<0){if(inp.tap){fullCells().forEach(([cx,cy],i)=>{if(hyp(inp.tap[0]-cx,inp.tap[1]-cy)<62&&s.myG<0)s.myG=i})}
+          if(s.myG<0&&el>GUESS)s.myG=Math.floor(Math.random()*N);
+          if(s.myG>=0&&!s.gSent){s.gSent=true;sendEv({k:'bg',p:s.ri,g:s.myG});beep(520,.1,'triangle',.05);bubble('me',(s.myG+1)+'번 너다!',1.2)}}
+        if(s.o.bot&&s.opG<0){if(s.botGAt==null)s.botGAt=now+2500+Math.random()*5000;if(now>=s.botGAt)s.opG=botGuess(s.mine)}
+        if(s.myG>=0&&s.opG>=0)settle(now)}
+      else if(s.ph==='rev'&&el>REV){const r=s.ri+1;if((r>=NR&&s.sc!==s.osc)||r>=MAXR){s.ended=true;s.endAt=now;return}
+        s.ri++;newRound(now);if(s.ri>=NR)bigText('동점! 연장전',true,1100)}},
+    onRemote(g){},
+    onEv(e){const p=Math.floor(num(e.p,-1));if(p<0||p>=MAXR)return;
+      if(e.k==='bs'&&!s.os[p]&&Array.isArray(e.a)){const a=e.a.map(v=>clamp(Math.floor(num(v)),0,N-1));s.os[p]={real:a[0],sign:a[1],acorn:a[2],box:a[3]}}
+      if(e.k==='bg'&&s.og[p]==null)s.og[p]=clamp(Math.floor(num(e.g)),0,N-1)},
+    botHear(e){},
+    state(){return{ri:s.ri}},
+    result(now){if(!s.ended||now-s.endAt<300)return null;return s.sc===s.osc?'draw':(s.sc>s.osc?'me':'opp')},
+    summary(){return'맞힌 진짜 나 '+s.sc+'번 · '+opName()+' '+s.osc+'번'},
+    hud(now){const el=(now-s.phAt)/1000,lab=(s.ri<NR?(s.ri+1)+'/'+NR+'판':'연장');
+      if(s.ph==='set')return{t:lab,c:s.sent?opName()+' 숨기는 중…':'숨기기 '+Math.max(0,Math.ceil(SET-el))+'초',cls:'go'};
+      if(s.ph==='guess')return{t:lab,c:s.myG<0?'찾기 '+Math.max(0,Math.ceil(GUESS-el))+'초':opName()+' 고르는 중…',cls:'it'};
+      return{t:lab,c:'나 '+s.sc+' : '+s.osc+' '+opName(),cls:'go'}},
+    button(){return s.ph==='set'&&!s.sent?{label:'준비 완료',off:s.mine.real<0}:{label:'준비 완료',off:true}},
+    draw(now){screen();const t=now/1000;const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#2e2547');g.addColorStop(1,'#1a1830');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+      ctx.textAlign='center';
+      if(s.ph==='set'){const C5=fullCells();ctx.fillStyle='#ffd59a';ctx.font='20px Jua, sans-serif';
+        ctx.fillText(s.sent?'준비 완료! '+opName()+' 기다리는 중':s.mine.real<0?'1. 👑 진짜 사랑이를 몰래 골라요':'2. 위장 도구를 아무한테나 붙여요',W/2,84);
+        C5.forEach(([x,y],i)=>drawDoll(x,y,1,s.mine,t,i,{crown:s.mine.real===i,realGlow:s.mine.real===i}));
+        if(!s.sent)trayRects().forEach(r=>{const tl=TOOLS[r.i],on=s.sel===r.i,placed=s.mine[tl.k]>=0;ctx.fillStyle=on?'#ffd59a':'rgba(255,255,255,.1)';rr(r.x,r.y,r.w,r.h,12);ctx.fill();
+          ctx.fillStyle=on?'#2b1b0b':'#f6ecdc';ctx.font='20px sans-serif';ctx.fillText(tl.ic,r.x+r.w/2,r.y+22);ctx.font='12px Jua, sans-serif';ctx.fillText(tl.n+(placed?' ✓':''),r.x+r.w/2,r.y+42)})
+        if(!s.sent){ctx.fillStyle='rgba(246,236,220,.6)';ctx.font='13px Jua, sans-serif';ctx.fillText('도구를 고르고 사랑이를 눌러요 · 👑은 상대에게 안 보여요',W/2,H-122-90)}}
+      else if(s.ph==='guess'){const C5=fullCells();ctx.fillStyle='#7ec6ff';ctx.font='20px Jua, sans-serif';ctx.fillText(opName()+'의 사랑이들 · 진짜는 누구?',W/2,84);
+        C5.forEach(([x,y],i)=>drawDoll(x,y,1,s.opSet,t,i,s.myG===i?{pin:'#ff8a68',pinT:'내 선택'}:null))}
+      else{const top=cells(96,H*.5),bot=cells(H*.5+40,H-150);
+        ctx.fillStyle='#7ec6ff';ctx.font='17px Jua, sans-serif';ctx.fillText(opName()+'의 진짜 '+(s.res.okMe?'→ 찾았다!':'→ 속았다'),W/2,92);
+        top.forEach(([x,y],i)=>drawDoll(x,y,.8,s.opSet,t,i,Object.assign({crown:s.opSet.real===i},s.myG===i?{pin:'#ff8a68',pinT:'내 선택'}:{})));
+        ctx.fillStyle='#ff8a68';ctx.font='17px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('나의 진짜 '+(s.res.okOp?'→ 들켰다':'→ 안 들켰다!'),W/2,H*.5+36);
+        bot.forEach(([x,y],i)=>drawDoll(x,y,.8,s.mine,t,i,Object.assign({crown:s.mine.real===i},s.opG===i?{pin:'#7ec6ff',pinT:opName()+' 선택'}:{})))}
+      if(s.ph!=='rev')drawBubble(W/2,H-250,C.bub.me,now);drawParts()}
+  }})();
+
+const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG,MemoryG,DanceG,BluffG];
 
 /* ================= 입력 ================= */
 const In={mx:0,my:0,mag:0,pressed:false,held:false};const J={active:false,id:-1,ox:0,oy:0,sx:0,sy:0,dx:0,dy:0,mag:0};const K={};
