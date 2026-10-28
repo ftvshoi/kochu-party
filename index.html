@@ -134,6 +134,22 @@ input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--lamp
 #rres>*{width:100%;max-width:460px;margin-left:auto;margin-right:auto;box-sizing:border-box}
 #rres p{margin:0;color:var(--mute)}
 @media (prefers-reduced-motion:reduce){#big.pop{animation:none}.wheel div{transition:none}}
+#emoB{position:fixed;z-index:12;top:calc(env(safe-area-inset-top,0px) + 54px);right:max(16px,env(safe-area-inset-right,0px));width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:rgba(23,21,43,.8);padding:0;font-size:20px;line-height:36px}
+#emoP{position:fixed;z-index:13;top:calc(env(safe-area-inset-top,0px) + 100px);right:max(12px,env(safe-area-inset-right,0px));width:min(300px,calc(100vw - 24px));display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px;border-radius:18px;background:rgba(23,21,43,.94);border:1px solid var(--line);box-shadow:0 12px 30px rgba(0,0,0,.5)}
+#emoP button{border:0;background:rgba(255,255,255,.06);border-radius:12px;padding:6px 2px 4px;color:var(--ink);font:12px var(--f-disp);display:flex;flex-direction:column;align-items:center;gap:3px}
+#emoP button:active{background:rgba(255,213,154,.25)}
+.emf{position:relative;width:46px;height:46px}
+.emf img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid #f6ecdc}
+.emf b{position:absolute;right:-6px;bottom:-4px;font-size:20px;font-weight:400}
+.stk{position:fixed;z-index:11;pointer-events:none;display:flex;flex-direction:column;align-items:center;animation:stkIn .35s cubic-bezier(.3,1.6,.5,1),stkOut .4s ease-in 2.1s forwards}
+.stk .emf{width:96px;height:96px}.stk .emf img{border-width:4px;box-shadow:0 8px 22px rgba(0,0,0,.45)}.stk .emf b{font-size:38px;right:-10px;bottom:-6px}
+.stk>span:not(.emf){margin-top:6px;background:#f6ecdc;color:#2b1b0b;font:19px var(--f-disp);padding:5px 12px;border-radius:14px;white-space:nowrap;box-shadow:0 4px 0 rgba(0,0,0,.3)}
+.stk.op .emf img{border-color:#7ec6ff}.stk.op>span:not(.emf){background:#7ec6ff;color:#10213a}
+.stk.me .emf img{border-color:#ff8a68}
+.stk .who{background:transparent!important;box-shadow:none!important;color:var(--ink)!important;font-size:13px!important;padding:0!important;margin-top:2px}
+@keyframes stkIn{from{transform:scale(.2) rotate(-15deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+@keyframes stkOut{to{transform:translateY(-30px) scale(.8);opacity:0}}
+@media (prefers-reduced-motion:reduce){.stk{animation:stkOut .4s ease-in 2.1s forwards}}
 </style>
 
 <div id="stage"><canvas id="cv"></canvas></div>
@@ -141,13 +157,15 @@ input[type=text]:focus-visible,button:focus-visible{outline:2px solid var(--lamp
 <div id="qcard" hidden><p class="qn" id="qn"></p><p class="qt" id="qt"></p><div class="bar"><i id="qbar"></i></div><p class="ans" id="qans" hidden></p><p class="ex" id="qex" hidden></p></div>
 <div id="big" hidden></div>
 <button id="snd" aria-label="소리 끄기/켜기"></button>
+<button id="emoB" hidden aria-label="이모티콘 보내기">😊</button>
+<div id="emoP" hidden></div>
 <button id="act" hidden aria-label="행동 버튼">멍!</button>
 
 <section class="panel" id="menu">
   <p class="eyebrow">밤마다 둘이서</p>
   <h1>코츄 밤 파티</h1>
   <ul class="rules">
-    <li>매 판 미니게임 18개 중 하나가 나와요. 진 사람이 다음 게임을 골라요.</li>
+    <li>매 판 미니게임 20개 중 하나가 나와요. 진 사람이 다음 게임을 골라요.</li>
     <li>이기면 도토리 1개. 먼저 5개 모으면 최종 우승이에요.</li>
     <li>왼손은 화면을 밀어서 이동, 오른손은 큰 버튼 하나만 써요.</li>
   </ul>
@@ -2081,7 +2099,7 @@ const show=(ids,on)=>ids.forEach(id=>$('#'+id).hidden=!on);
 function pickGame(r){if(C.forceG!=null)return GAMES[C.forceG];if(C.M&&C.M.chosen&&C.M.chosen.r===r)return GAMES[C.M.chosen.g];if(C.M&&C.M.bot&&C.soloPick>=0)return GAMES[C.soloPick];const n=GAMES.length;const ord=c=>shuffle(GAMES.map((_,i)=>i),mulberry32((C.M.seed+c*7919)>>>0));const c=Math.floor((r-1)/n);let o=ord(c);
   if(c>0){const prev=ord(c-1);if(o[0]===prev[n-1])[o[0],o[1]]=[o[1],o[0]]}return GAMES[o[(r-1)%n]]}
 function roundSeed(r){return((C.M.seed^Math.imul(r,2654435761))>>>0)||1}
-function startMatch(seed,idx,oppC,bot){C.M={seed,idx,round:0,pts:[0,0],target:5,oppC,bot};C.evq=[];
+function startMatch(seed,idx,oppC,bot){C.M={seed,idx,round:0,pts:[0,0],target:5,oppC,bot};C.evq=[];{const q=Net.peer();C.emoSeen=q&&q.emo?num(q.emo.n):0}
   const pp=Net.peer();C.seenEv=pp&&Array.isArray(pp.evq)?pp.evq.reduce((m,e)=>Math.max(m,num(e&&e.n)),0):0;
   pres({rd:false,m:seed,r:0,res:null,nx:null});nextRound()}
 function nextRound(){const M=C.M;M.round++;if(C.G&&C.G.cleanup)C.G.cleanup();C.G=null;const G=pickGame(M.round);C.next=G;
@@ -2119,11 +2137,34 @@ function showFinal(){const M=C.M,won=M.pts[M.idx]>=M.target;C.phase='final';show
 $('#rNext').addEventListener('click',()=>{audioInit();markNext()});
 $('#rPick').addEventListener('click',()=>{audioInit();toWait()});
 
+
+/* ================= 인형 이모티콘 ================= */
+const EMO=[['sarang','사랑해','💕'],['sarang','이겼다 히히','😆'],['sarang','잘했어!','👏'],['mangdeong','메롱~','😛'],['mangdeong','힝 억울해','😢'],['mangdeong','코츄~','😘'],
+  ['eevee','화이팅!','💪'],['misso','ㅋㅋㅋㅋ','🤣'],['sio','봐주세요…','🙏'],['teddy','멍멍! 왈!','💢'],['pairi','불타오른다','🔥'],['bcain','졸려…','💤']];
+const emoSrc=k=>k==='pairi'?PAIRI.src:k==='bcain'?BCAIN.src:IMG[k];
+const emoFace=e=>'<span class="emf"><img alt="" src="'+emoSrc(e[0])+'"><b>'+e[2]+'</b></span>';
+$('#emoP').innerHTML=EMO.map((e,i)=>'<button type="button" data-i="'+i+'">'+emoFace(e)+'<span>'+e[1]+'</span></button>').join('');
+let emoN=0,emoLast=0,emoStk={me:null,op:null};
+function showSticker(i,who){const e=EMO[i];if(!e)return;const old=emoStk[who];if(old)old.remove();const d=document.createElement('div');d.className='stk '+who;
+  d.innerHTML=emoFace(e)+'<span>'+e[1]+'</span><span class="who">'+(who==='me'?'나':opName())+'</span>';
+  if(who==='op'){d.style.left='max(16px,env(safe-area-inset-left,0px))';d.style.top='calc(env(safe-area-inset-top,0px) + 60px)'}else{d.style.right='calc(max(16px,env(safe-area-inset-right,0px)) + 2px)';d.style.bottom='calc(env(safe-area-inset-bottom,0px) + 130px)'}
+  document.body.appendChild(d);emoStk[who]=d;setTimeout(()=>{d.remove();if(emoStk[who]===d)emoStk[who]=null},2600);beep(who==='me'?740:1046,.12,'triangle',.06)}
+function sendEmo(i){const now=performance.now();if(now-emoLast<900||!C.M)return;emoLast=now;showSticker(i,'me');$('#emoP').hidden=true;
+  if(C.M.bot){if(Math.random()<.55)setTimeout(()=>{if(C.M)showSticker(Math.floor(Math.random()*EMO.length),'op')},900+Math.random()*1200);return}
+  emoN++;pres({emo:{m:C.M.seed,n:emoN,i}})}
+$('#emoB').addEventListener('click',e=>{e.stopPropagation();audioInit();$('#emoP').hidden=!$('#emoP').hidden});
+$('#emoP').addEventListener('click',e=>{e.stopPropagation();const b=e.target.closest('button');if(b)sendEmo(+b.dataset.i)});
+['pointerdown','touchstart'].forEach(n=>{$('#emoP').addEventListener(n,e=>e.stopPropagation());$('#emoB').addEventListener(n,e=>e.stopPropagation())});
+document.addEventListener('pointerdown',e=>{if(!$('#emoP').hidden&&!e.target.closest('#emoP,#emoB'))$('#emoP').hidden=true});
+function tickEmo(pp){const M=C.M,on=!!M&&['play','rres','intro','spin'].includes(C.phase);if($('#emoB').hidden===on){$('#emoB').hidden=!on;if(!on)$('#emoP').hidden=true}
+  if(M&&!M.bot&&pp&&pp.emo&&pp.emo.m===M.seed&&num(pp.emo.n)>C.emoSeen){C.emoSeen=num(pp.emo.n);if(on)showSticker(clamp(Math.floor(num(pp.emo.i)),0,EMO.length-1),'op')}}
+
 /* ================= 매 프레임 ================= */
 let hudAt=0;
 function frame(){
   const now=performance.now(),dt=Math.min(.05,(now-C.last)/1000||.016);C.last=now;readInput();
   const pp=Net.peer(),M=C.M;
+  tickEmo(pp);
   if(C.phase==='wait')tickWait(pp);
   else if(C.phase==='spin')tickSpin(now);
   else if(C.phase==='intro')tickIntro(now);
