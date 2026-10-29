@@ -2856,12 +2856,16 @@ const In={mx:0,my:0,mag:0,pressed:false,held:false};const J={active:false,id:-1,
 window.addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT')return;const k=e.key.length===1?e.key.toLowerCase():e.key;if(!K[k]&&(k===' '||k==='Enter'||k==='b')){In.pressed=true;In.held=true}K[k]=true;if(k.startsWith('Arrow')||k===' ')e.preventDefault()});
 window.addEventListener('keyup',e=>{const k=e.key.length===1?e.key.toLowerCase():e.key;K[k]=false;if((k===' '||k==='Enter'||k==='b')&&In.held){In.held=false;In.rel=true}});
 const stage=$('#stage');
-stage.addEventListener('pointerdown',e=>{audioInit();if(C.phase!=='play'||!C.G)return;if(C.G.tapPos){In.tap=[e.clientX,e.clientY];return}if(C.G.tap){In.pressed=true;return}if(J.active)return;
+stage.addEventListener('pointerdown',e=>{audioInit();if(C.phase!=='play'||!C.G)return;if(C.G.tapPos){In.tap=[e.clientX,e.clientY];return}if(C.G.tap){In.pressed=true;return}
   J.active=true;J.id=e.pointerId;J.ox=e.clientX;J.oy=e.clientY;J.sx=e.clientX;J.sy=e.clientY;J.dx=J.dy=J.mag=0;try{stage.setPointerCapture(e.pointerId)}catch(_){}});
 stage.addEventListener('pointermove',e=>{if(!J.active||e.pointerId!==J.id)return;let dx=e.clientX-J.ox,dy=e.clientY-J.oy;const len=hyp(dx,dy),mx=52;
   if(len>mx){J.ox+=dx/len*(len-mx);J.oy+=dy/len*(len-mx);dx=e.clientX-J.ox;dy=e.clientY-J.oy}const l=hyp(dx,dy);J.sx=e.clientX;J.sy=e.clientY;
   if(l<8){J.mag=0;J.dx=J.dy=0}else{J.dx=dx/l;J.dy=dy/l;J.mag=Math.min(1,(l-8)/(mx-8))}});
-const endJ=e=>{if(e.pointerId===J.id){J.active=false;J.mag=0;J.dx=J.dy=0}};stage.addEventListener('pointerup',endJ);stage.addEventListener('pointercancel',endJ);
+const resetJ=()=>{J.active=false;J.id=-1;J.mag=0;J.dx=J.dy=0};
+const endJ=e=>{if(e.pointerId===J.id)resetJ()};
+['pointerup','pointercancel','lostpointercapture'].forEach(n=>{stage.addEventListener(n,endJ);window.addEventListener(n,endJ)});
+window.addEventListener('touchend',e=>{if(J.active&&e.touches.length===0)resetJ()});window.addEventListener('touchcancel',resetJ);
+window.addEventListener('blur',resetJ);document.addEventListener('visibilitychange',()=>{if(document.hidden)resetJ()});
 const act=$('#act');
 act.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();audioInit();act.classList.add('down');In.pressed=true;In.held=true;try{act.setPointerCapture(e.pointerId)}catch(_){}});
 ['pointerup','pointercancel'].forEach(n=>act.addEventListener(n,()=>{act.classList.remove('down');if(In.held)In.rel=true;In.held=false}));
@@ -2877,7 +2881,7 @@ function roundSeed(r){return((C.M.seed^Math.imul(r,2654435761))>>>0)||1}
 function startMatch(seed,idx,oppC,bot){C.M={seed,idx,round:0,pts:[0,0],target:5,oppC,bot};C.evq=[];{const q=Net.peer();C.emoSeen=q&&q.emo?num(q.emo.n):0}
   const pp=Net.peer();C.seenEv=pp&&Array.isArray(pp.evq)?pp.evq.reduce((m,e)=>Math.max(m,num(e&&e.n)),0):0;
   pres({rd:false,m:seed,r:0,res:null,nx:null});nextRound()}
-function nextRound(){const M=C.M;M.round++;if(C.G&&C.G.cleanup)C.G.cleanup();C.G=null;const G=pickGame(M.round);C.next=G;
+function nextRound(){resetJ();const M=C.M;M.round++;if(C.G&&C.G.cleanup)C.G.cleanup();C.G=null;const G=pickGame(M.round);C.next=G;
   show(['menu','wait','rres','final','intro','hud'],false);$('#act').hidden=true;$('#qcard').hidden=true;$('#big').hidden=true;
   $('#spinRound').textContent=M.round+'라운드 · 나 '+M.pts[M.idx]+' : '+M.pts[1-M.idx]+' '+opName();
   if((M.bot&&C.soloPick>=0)||(M.chosen&&M.chosen.r===M.round)){showIntro(performance.now());return}$('#wheel').innerHTML=GAMES.map(g=>'<div>'+g.name+'</div>').join('');$('#spin').hidden=false;C.phase='spin';C.spinAt=performance.now();C.spinTarget=GAMES.indexOf(G);C.spinLast=-1}
@@ -2890,7 +2894,7 @@ function showIntro(now){const G=C.next,M=C.M;$('#spin').hidden=true;$('#intro').
   const vs=$('#introStat');if(G.stat){vs.hidden=false;vs.innerHTML='<div>중요한 스탯 · '+STATN[G.stat]+'</div><div class="st"><span>나</span>'+pips(CHARS[C.char].st[G.stat])+'</div><div class="st"><span>'+opName()+'</span>'+pips(CHARS[M.oppC].st[G.stat])+'</div>'}else vs.hidden=true}
 function tickIntro(now){const e=now-C.introAt,left=Math.ceil((5200-e)/1000);$('#introCnt').textContent=left>3?'':String(Math.max(1,left));if(left<=3&&left!==C.lastCnt){C.lastCnt=left;if(left>=1)beep(440,.12,'sine',.06)}if(e>=5200)startPlay(now)}
 function startPlay(now){const M=C.M,G=C.next;$('#intro').hidden=true;C.parts=[];C.bub={me:null,op:null};C.shake=0;C.decided=false;
-  G.init({seed:roundSeed(M.round),me:M.idx,myC:C.char,oppC:M.oppC,bot:M.bot,now});C.G=G;C.phase='play';$('#hud').hidden=false;$('#act').hidden=false;beep(880,.25,'triangle',.08)}
+  resetJ();G.init({seed:roundSeed(M.round),me:M.idx,myC:C.char,oppC:M.oppC,bot:M.bot,now});C.G=G;C.phase='play';$('#hud').hidden=false;$('#act').hidden=false;beep(880,.25,'triangle',.08)}
 function declare(r){const M=C.M;const w=r==='draw'?-1:(r==='me'?M.idx:1-M.idx);C.decided=true;if(!M.bot)pres({res:{m:M.seed,r:M.round,w}});finishRound(w)}
 function scoreHTML(){const M=C.M,row=(ci,n,op,name)=>{let a='';for(let i=0;i<M.target;i++)a+='<i class="'+(i<n?'on':'')+'"></i>';return'<div class="srow'+(op?' op':'')+'"><span class="face">'+faceHTML(ci)+'</span><div><div>'+name+' · '+n+'개</div><div class="acs">'+a+'</div></div></div>'};
   return row(C.char,M.pts[M.idx],false,'나')+row(M.oppC,M.pts[1-M.idx],true,opName())}
