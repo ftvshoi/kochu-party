@@ -743,23 +743,31 @@ const TowerG=(()=>{
 
 /* ================= 게임 5: 코츄 몰래 훔치기 ================= */
 const StealG=(()=>{
-  const T=40,GW=15,GH=21,NR=2,INTRO=3.6,PLAY=40,END=2.6,LT=115,LG=118,BR=95,CATCH=PR*2+6,DOLLS=[2,3,4,0,1];
-  const B=[{x0:6,y0:1,x1:8,y1:2,name:'도둑 아지트'},{x0:6,y0:17,x1:8,y1:19,name:'인형 금고'}];
+  const T=40,GW=15,GH=21,NR=2,INTRO=2.8,PLAY=35,END=2.6,LT=145,LG=165,BR=95,CATCH=PR*2+6,DOLLS=[2,3,4,0,1];
+  const B=[{x0:1,y0:1,x1:3,y1:3,name:'도둑 아지트'},{x0:GW-4,y0:GH-4,x1:GW-2,y1:GH-2,name:'인형 금고'}];
   const bc=b=>[(b.x0+b.x1+1)/2*T,(b.y0+b.y1+1)/2*T];
   const inB=(p,b)=>p.x>b.x0*T&&p.x<(b.x1+1)*T&&p.y>b.y0*T&&p.y<(b.y1+1)*T;
   let s=null,dark=null;
-  const MAPS=[{n:'네 갈래 길',d:'길이 4개! 이번엔 어느 길로 갈까?'},{n:'세 갈래 꼬부랑길',d:'꼬불꼬불 길 3개. 들키지 않게!'},{n:'다섯 갈래 길',d:'좁은 길 5개. 경비는 하나만 지킬 수 있어요'}];
+  const MAPS=[{n:'네 갈래 길',d:'가구 사이 길 4개! 중간중간 샛길이 있어요'},{n:'세 갈래 길',d:'넓은 길 3개, 샛길로 갈아탈 수 있어요'},{n:'다섯 갈래 길',d:'좁은 길 5개. 경비는 다 못 막아요'}];
+  const FT=['desk','shelf','box','chair','sofa'];
   function border(){const g=new Uint8Array(GW*GH);for(let x=0;x<GW;x++){g[x]=1;g[(GH-1)*GW+x]=1}for(let y=0;y<GH;y++){g[y*GW]=1;g[y*GW+GW-1]=1}return g}
-  function gen(seed){const kind=(seed>>>5)%3,r=mulberry32(seed^0x1a7e),g=border(),ix=(x,y)=>y*GW+x,Y0=5,Y1=15;let lanes;
-    for(let y=Y0;y<=Y1;y++)for(let x=1;x<GW-1;x++)g[ix(x,y)]=1;
-    const carve=pts=>pts.forEach(([x,y])=>g[ix(x,y)]=0);
-    if(kind===0){lanes=[1,5,9,13].map(x=>{const p=[];for(let y=Y0;y<=Y1;y++)p.push([x,y]);carve(p);return p})}
-    else if(kind===2){lanes=[1,4,7,10,13].map(x=>{const p=[];for(let y=Y0;y<=Y1;y++)p.push([x,y]);carve(p);return p})}
-    else{const bands=[[1,3],[6,8],[11,13]];lanes=bands.map(([lo,hi])=>{let x=lo+Math.floor(r()*(hi-lo+1));const p=[];for(let y=Y0;y<=Y1;y++){p.push([x,y]);if(y<Y1&&y%2===0&&r()<.7){const nx=clamp(x+(r()<.5?-1:1)*(1+Math.floor(r()*2)),lo,hi);const st=Math.sign(nx-x);for(let xx=x;xx!==nx;xx+=st)p.push([xx+st,y]);x=nx}}carve(p);return p})}
-    const furn=[];for(let y=Y0;y<=Y1;y++){let x=1;while(x<GW-1){if(g[ix(x,y)]){let w=0;while(x+w<GW-1&&g[ix(x+w,y)])w++;furn.push({x,y,w,h:1,ty:'hedge'});x+=w}else x++}}
-    const lp=lanes.map(p=>{const mid=p[Math.floor(p.length/2)];return{top:[(p[0][0]+.5)*T,(p[0][1]+.5)*T],mid:[(mid[0]+.5)*T,(mid[1]+.5)*T],bot:[(p[p.length-1][0]+.5)*T,(p[p.length-1][1]+.5)*T]}});
-    return{w:GW,h:GH,g,furn,kind,lanes:lp}}
-  function dollsFor(seed,mz){const [vx,vy]=bc(B[1]);return[[vx,vy+6],[2.5*T,18.5*T],[4.5*T,17*T],[10.5*T,17*T],[12.5*T,18.5*T]].map(([x,y])=>({x,y}))}
+  function gen(seed){const kind=(seed>>>5)%3,r=mulberry32(seed^0x1a7e),g=border(),ix=(x,y)=>y*GW+x,Y0=5,Y1=15;
+    const LN=[[1,5,9,13],[1,2,7,12,13],[1,4,7,10,13]][kind];
+    for(let y=Y0;y<=Y1;y++)for(let x=1;x<GW-1;x++)if(!LN.includes(x))g[ix(x,y)]=1;
+    const cols=[];for(let x=1;x<GW-1;x++){if(LN.includes(x))continue;if(cols.length&&cols[cols.length-1][1]===x-1)cols[cols.length-1][1]=x;else cols.push([x,x])}
+    const safe=[],furn=[];
+    cols.forEach(([x0,x1])=>{const ys=shuffle([7,8,9,10,11,12,13],r);const pass=[ys[0]];if(r()<.6&&Math.abs(ys[1]-ys[0])>=2)pass.push(ys[1]);const sy=ys.find(y=>pass.every(p=>Math.abs(p-y)>=2));
+      pass.forEach(y=>{for(let x=x0;x<=x1;x++)g[ix(x,y)]=0});
+      if(sy!=null){const side=r()<.5?x0:x1;g[ix(side,sy)]=0;safe.push({x:(side+.5)*T,y:(sy+.5)*T})}
+      for(let y=Y0;y<=Y1;y++){let x=x0;while(x<=x1){if(g[ix(x,y)]){let w=0;while(x+w<=x1&&g[ix(x+w,y)])w++;furn.push({x,y,w,h:1});x+=w}else x++}}});
+    const merged=[];furn.forEach(f=>{const p=merged.find(q=>q.x===f.x&&q.w===f.w&&q.y+q.h===f.y&&q.h<3);if(p)p.h++;else merged.push(Object.assign({},f))});
+    merged.forEach(f=>f.ty=FT[Math.floor(r()*FT.length)]);
+    [[5,2,2,1],[10,3,2,1],[4,18,2,1],[8,17,1,1]].forEach(([x,y,w,h],i)=>{if(r()<.7&&!B.some(b=>x+w>b.x0-1&&x<=b.x1+1&&y+h>b.y0-1&&y<=b.y1+1)){for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)g[ix(xx,yy)]=1;merged.push({x,y,w,h,ty:FT[(i+2)%5]})}});
+    const lanes=[];LN.forEach((x,i)=>{if(i>0&&LN[i-1]===x-1)return;const w=LN.includes(x+1)?2:1,cx=(x+w/2)*T;lanes.push({top:[cx,(Y0+.5)*T],bot:[cx,(Y1+.5)*T],mid:[cx,((Y0+Y1)/2+.5)*T]})});
+    return{w:GW,h:GH,g,furn:merged,kind,safe,lanes}}
+  function dollsFor(seed,mz){const [vx,vy]=bc(B[1]);return[[vx,vy+6],[2.5*T,18.5*T],[6.5*T,17.5*T],[9.5*T,18.5*T],[12.5*T,2.5*T]].map(([x,y])=>({x,y}))}
+  const inSafe=p=>s.mz.safe.some(q=>hyp(p.x-q.x,p.y-q.y)<T*.62);
+  function pushOut(p){s.mz.safe.forEach(q=>{const dx=p.x-q.x,dy=p.y-q.y,d=hyp(dx,dy)||1;if(d<T*.8){p.x=q.x+dx/d*T*.8;p.y=q.y+dy/d*T*.8}});const b=B[0];if(inB(p,b)){const ex=(b.x1+1)*T+PR-p.x,ey=(b.y1+1)*T+PR-p.y;if(ex<ey)p.x+=ex;else p.y+=ey}}
   const thiefIdx=r=>(r+s.first)%2,amThief=()=>thiefIdx(s.r)===s.o.me;
   const ph=now=>{const e=(now-s.rs)/1000;if(e<INTRO)return['intro',e];if(e<INTRO+PLAY)return['play',e-INTRO];return['end',e-INTRO-PLAY]};
   const thief=()=>amThief()?s.me:s.op,guard=()=>amThief()?s.op:s.me;
@@ -775,18 +783,18 @@ const StealG=(()=>{
     let tx=gx,ty=gy;if(hyp(gx-b.x,gy-b.y)>T*1.1){const tg=gStep(s.mz,T,b,bt.dm,true,bt.nav,dt);if(tg){tx=tg[0];ty=tg[1]}}botWalk(b,tx,ty,sp,dt);gResolve(s.mz,b,T)}
   function stepBot(dt,now){const b=s.op,bt=s.bot,m=s.me;b.st=Math.max(0,b.st-dt);bt.cd=Math.max(0,bt.cd-dt);b.dash=Math.max(0,b.dash-dt);const d=hyp(m.x-b.x,m.y-b.y);
     if(amThief()){// 봇 = 경비
-      let gx,gy;if(d<LG*.9){gx=m.x;gy=m.y}else{if(bt.lane==null||now>bt.lt){bt.lane=Math.floor(Math.random()*s.mz.lanes.length);bt.lt=now+3000+Math.random()*3000}const q=s.mz.lanes[bt.lane][Math.random()<.002?'mid':'bot'];gx=q[0];gy=q[1]+T*.6}
+      let gx,gy;if(d<LG*.9){gx=m.x;gy=m.y}else{const pts=[bc(B[1]),...s.dl.filter((_,i)=>avail(i)).map(q=>[q.x,q.y])];const q=pts[Math.floor(bt.pat)%pts.length];gx=q[0];gy=q[1];if(hyp(gx-b.x,gy-b.y)<T)bt.pat+=1+Math.floor(Math.random()*2)}
       botGo(b,bt,gx,gy,s.od.speed*.9*(b.st>0?.25:1),dt);
       if(bt.cd<=0&&d<BR*.8&&Math.random()<dt*3){bt.cd=4;bubble('op','멍!',1);ring(b.x,b.y,'#7ec6ff',BR);barkHit(m,b.x,b.y,'me')}
-      if(s.ccd<=0&&d<CATCH){s.ccd=2;caughtT(m,'me')}}
+      if(s.ccd<=0&&d<CATCH&&!inSafe(m)&&!inB(m,B[0])){s.ccd=2;caughtT(m,'me')}pushOut(b);gResolve(s.mz,b,T)}
     else{// 봇 = 도둑
       let goal;if(b.c>=0)goal=bc(B[0]);else{let best=null,bd=1e9;s.dl.forEach((q,i)=>{if(!avail(i))return;const dd=hyp(q.x-b.x,q.y-b.y)+(d<160?-hyp(q.x-m.x,q.y-m.y)*.6:0);if(dd<bd){bd=dd;best=q}});goal=best?[best.x,best.y]:bc(B[0])}
       if(bt.cd<=0&&d<120){bt.cd=4;b.dash=.5;bubble('op','휙!',.6)}
-      if(bt.wpFor!==b.c){bt.wpFor=b.c;bt.wp=s.mz.lanes[Math.floor(Math.random()*s.mz.lanes.length)].mid}if(bt.wp&&hyp(bt.wp[0]-b.x,bt.wp[1]-b.y)<T*.7)bt.wp=null;if(bt.wp)goal=bt.wp;
+      if(bt.wpFor!==b.c){bt.wpFor=b.c;bt.wp=s.mz.lanes[Math.floor(Math.random()*s.mz.lanes.length)].mid}if(bt.wp&&hyp(bt.wp[0]-b.x,bt.wp[1]-b.y)<T*.8)bt.wp=null;if(bt.wp)goal=bt.wp;
       botGo(b,bt,goal[0],goal[1],s.od.speed*.92*(b.c>=0?.85:1)*(b.dash>0?1.9:1)*(b.st>0?.25:1),dt);thiefLogic(b,'op')}}
   return{
     id:'steal',name:'코츄 경찰과 도둑',btn:'멍!',stat:'run',stick:true,
-    rules:['한 명은 도둑, 한 명은 경비! 2판 하면서 역할을 바꿔요. 불 꺼진 방이라 내 주변만 보여요.','위쪽 도둑 아지트와 아래쪽 인형 방 사이는 담으로 막힌 갈래길(3~5개)로만 이어져요. 도둑: 매번 어느 길로 갈지 골라서 아래 인형을 들고 아지트로! 휙!(대시)으로 빠르게 도망가요.','경비: 도둑에게 닿으면 잡아서 아지트로 돌려보내요(인형은 제자리로). 멍!으로 도둑을 깜짝 놀래켜 멈추게 해요. 도둑일 때 더 많이 훔친 쪽이 승리!'],
+    rules:['한 명은 도둑, 한 명은 경비! 2판 하면서 역할을 바꿔요. 불 꺼진 방이라 내 주변만 보여요.','도둑: 인형 5개(금고와 방 곳곳)를 몰래 들고 아지트(왼쪽 위)로 가져가면 1개! 가구 사이 갈래길(1·2·3…)과 샛길로 경비를 속여요. 🏠 숨숨집과 아지트 안에서는 안 잡히고 경비는 못 들어와요.','경비: 도둑에게 닿으면 잡아서 아지트로 돌려보내요(인형은 제자리로). 멍!으로 도둑을 깜짝 놀래켜 멈추게 해요. 도둑일 때 더 많이 훔친 쪽이 승리!'],
     init(o){const mz=gen(o.seed);s={o,mz,dl:dollsFor(o.seed,mz),first:(o.seed>>>6)&1,r:0,score:[0,0],me:{},op:{ok:o.bot?true:undefined},d:derive(o.myC),od:derive(o.oppC),ended:false,endAt:0,bot:o.bot?{}:null,fsT:0,del:new Set()};newRound(o.now);bigText('맵: '+MAPS[mz.kind].n,true,1500)},
     step(dt,now,inp){if(s.ended)return;const [P,pe]=ph(now),m=s.me,op=s.op,th=amThief();
       if(P!==s.lastP){s.lastP=P;if(P==='play'){bigText(th?'훔쳐라!':'지켜라!',true,900);beep(660,.2,'triangle',.06)}if(P==='end')bigText('시간 끝!',true,1200)}
@@ -795,20 +803,20 @@ const StealG=(()=>{
       s.cd=Math.max(0,s.cd-dt);s.ccd=Math.max(0,s.ccd-dt);m.st=Math.max(0,m.st-dt);m.dash=Math.max(0,m.dash-dt);
       const sp=s.d.speed*(th?(m.c>=0?.85:1.02)*(m.dash>0?1.9:1):1)*(m.st>0?.25:1);walk(m,inp,sp,dt);gResolve(s.mz,m,T);
       if(inp.pressed&&s.cd<=0){s.cd=4;if(th){m.dash=.5;bubble('me','휙!',.6);beep(700,.1,'triangle',.05);for(let i=0;i<4;i++)dust(m.x,m.y)}else{bubble('me','멍!',1);ring(m.x,m.y,'#7ec6ff',BR);beep(300,.15,'square',.05);if(s.o.bot)barkHit(op,m.x,m.y,'op');else sendEv({k:'bark',x:Math.round(m.x),y:Math.round(m.y),p:s.r})}}
-      if(th)thiefLogic(m,'me');
-      else if(s.ccd<=0&&op.ok!==false&&hyp(op.x-m.x,op.y-m.y)<CATCH){s.ccd=2;if(s.o.bot)caughtT(op,'op');else{sendEv({k:'cg',p:s.r});bubble('me','잡았다!',1);beep(880,.2,'triangle',.07);bigText('잡았다! 코츄!',true,1000)}}
-      
+      if(th)thiefLogic(m,'me');else{pushOut(m);gResolve(s.mz,m,T)}
+      if(!th&&s.ccd<=0&&op.ok!==false&&hyp(op.x-m.x,op.y-m.y)<CATCH&&!inSafe(op)&&!inB(op,B[0])){s.ccd=2;if(s.o.bot)caughtT(op,'op');else{sendEv({k:'cg',p:s.r});bubble('me','잡았다!',1);beep(880,.2,'triangle',.07);bigText('잡았다! 코츄!',true,1000)}}
+      const dd=hyp(op.x-m.x,op.y-m.y),L=th?LT:LG;if(dd>L&&dd<300){s.fsT-=dt;if(s.fsT<=0){s.fsT=.6;P2step(op.x,op.y)}}
       if(s.bot)stepBot(dt,now);else smooth(op,dt)},
     onRemote(g){if(num(g.r,-1)!==s.r)return;remoteTo(s.op,g,0,0,GW*T,GH*T);if(hyp(s.op.tx-s.op.x,s.op.ty-s.op.y)>3*T){s.op.x=s.op.tx;s.op.y=s.op.ty}
       if(!amThief()){const c=Math.floor(num(g.c,-1));s.op.c=c>=0&&c<s.dl.length?c:-1;if(Array.isArray(g.dl)){let added=0;g.dl.forEach(i=>{if(Number.isInteger(i)&&i>=0&&i<s.dl.length&&!s.del.has(i)){s.del.add(i);added++}});if(added){s.score[thiefIdx(s.r)]=s.del.size;bigText(opName()+' 성공 · '+s.del.size+'개째',true,1000,true)}}}},
-    onEv(e){if(num(e.p,-1)!==s.r||s.ended)return;if(e.k==='cg'&&amThief()&&ph(performance.now())[0]==='play')caughtT(s.me,'me');if(e.k==='bark'&&amThief()){bubble('op','멍!',1);ring(num(e.x),num(e.y),'#7ec6ff',BR);barkHit(s.me,num(e.x),num(e.y),'me')}},
+    onEv(e){if(num(e.p,-1)!==s.r||s.ended)return;if(e.k==='cg'&&amThief()&&ph(performance.now())[0]==='play'&&!inSafe(s.me)&&!inB(s.me,B[0]))caughtT(s.me,'me');if(e.k==='bark'&&amThief()){bubble('op','멍!',1);ring(num(e.x),num(e.y),'#7ec6ff',BR);barkHit(s.me,num(e.x),num(e.y),'me')}},
     botHear(e){},
     state(){return{x:Math.round(s.me.x),y:Math.round(s.me.y),c:s.me.c,dl:amThief()?Array.from(s.del):[],r:s.r,sc:s.score[s.o.me]}},
     result(now){if(!s.ended||now-s.endAt<500)return null;const a=s.score[s.o.me],b=s.score[1-s.o.me];return a===b?'draw':(a>b?'me':'opp')},
     summary(){return'훔친 인형 나 '+s.score[s.o.me]+'개 · '+opName()+' '+s.score[1-s.o.me]+'개'},
     hud(now){const [P,pe]=ph(now),th=amThief();const sec=P==='play'?Math.ceil(PLAY-pe):PLAY;return{t:(s.r+1)+'/'+NR+'판 0:'+String(sec).padStart(2,'0'),low:P==='play'&&sec<=8,c:(th?(s.me.c>=0?'인형 들고 아지트로!':'🦹 도둑'):'👮 경비')+' · '+s.score[s.o.me]+':'+s.score[1-s.o.me],cls:th?(s.me.c>=0?'it':'run'):'go'}},
     button(){const th=amThief();return{label:th?'휙!':'멍!',cd:s.cd/4}},
-    draw(now){const t=now/1000,[P]=ph(now),th=amThief(),z=clamp(Math.min(W/(GW*T+16),H/(12*T)),.55,1.7),wW=GW*T,wH=GH*T,vw=W/z,vh=H/z,m=s.me,op=s.op;
+    draw(now){const t=now/1000,[P]=ph(now),th=amThief(),z=clamp(Math.min(W,H)/(8*T),.8,1.7),wW=GW*T,wH=GH*T,vw=W/z,vh=H/z,m=s.me,op=s.op;
       const cx=vw>=wW?wW/2:clamp(m.x,vw/2,wW-vw/2),cy=vh>=wH?wH/2:clamp(m.y,vh/2,wH-vh/2),sh=C.shake*30;
       screen();ctx.fillStyle='#08070f';ctx.fillRect(0,0,W,H);const toS=cam(cx,cy,z,(Math.random()-.5)*sh,(Math.random()-.5)*sh);
       ctx.fillStyle=pat(PLANK);ctx.fillRect(0,0,wW,wH);ctx.fillStyle=pat(WALLP);for(let y=0;y<GH;y++)for(let x=0;x<GW;x++)if(x===0||y===0||x===GW-1||y===GH-1)ctx.fillRect(x*T,y*T,T,T);
@@ -818,10 +826,12 @@ const StealG=(()=>{
         if(f.ty==='box'){ctx.fillStyle='rgba(255,255,255,.3)';ctx.fillRect(f.x*T+6,f.y*T+10,f.w*T-12,4)}if(f.ty==='hedge'){ctx.fillStyle=pat(QUILT);ctx.fillRect(f.x*T+4,f.y*T+4,T-8,T-14)}if(f.ty==='plant'){ctx.font='26px sans-serif';ctx.textAlign='center';ctx.fillText('🪴',f.x*T+T/2,f.y*T+T*.75)}if(f.ty==='sofa'){ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(f.x*T+8,f.y*T+8,f.w*T-16,6)}}
       // 아지트·금고
       const A0=B[0],A1=B[1];ctx.fillStyle='rgba(255,138,104,.18)';rr(A0.x0*T+4,A0.y0*T+4,(A0.x1-A0.x0+1)*T-8,(A0.y1-A0.y0+1)*T-8,14);ctx.fill();ctx.strokeStyle='rgba(255,138,104,.6)';ctx.lineWidth=3;ctx.setLineDash([8,6]);ctx.stroke();ctx.setLineDash([]);
-      ctx.fillStyle='rgba(255,212,122,.14)';rr(1*T+4,16*T+4,(GW-2)*T-8,4*T-8,16);ctx.fill();ctx.setLineDash([8,6]);ctx.strokeStyle='rgba(255,212,122,.45)';ctx.lineWidth=3;ctx.stroke();ctx.setLineDash([]);
-      ctx.font='14px Jua, sans-serif';ctx.textAlign='center';ctx.fillStyle='#ffb39c';ctx.fillText('🦹 도둑 아지트',bc(A0)[0],A0.y0*T-4+T*.2);ctx.fillStyle='#ffd59a';ctx.fillText('🧸 인형 방',bc(A1)[0],A1.y0*T+10);
+      ctx.fillStyle='#e8b4a0';rr(A1.x0*T+6,A1.y0*T+14,(A1.x1-A1.x0+1)*T-12,(A1.y1-A1.y0+1)*T-20,18);ctx.fill();ctx.strokeStyle='#b77d68';ctx.lineWidth=5;ctx.beginPath();ctx.arc((A1.x0+A1.x1+1)/2*T,A1.y0*T+18,34,Math.PI,0);ctx.stroke();
+      ctx.font='14px Jua, sans-serif';ctx.textAlign='center';ctx.fillStyle='#ffb39c';ctx.fillText('🦹 도둑 아지트',bc(A0)[0],A0.y0*T-4+T*.2);ctx.fillStyle='#ffd59a';ctx.fillText('🔒 인형 금고',bc(A1)[0],A1.y0*T+10);
       // 아지트에 쌓인 인형
       Array.from(s.del).forEach((i,k)=>drawToken(bc(A0)[0]-30+k*20,bc(A0)[1]+18,DOLLS[i],{scale:.55}));
+      s.mz.safe.forEach(q=>{ctx.fillStyle='rgba(143,224,138,.22)';ctx.beginPath();ctx.arc(q.x,q.y,T*.62,0,7);ctx.fill();ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(143,224,138,.8)';ctx.lineWidth=2.5;ctx.stroke();ctx.setLineDash([]);ctx.font='18px sans-serif';ctx.textAlign='center';ctx.fillText('🏠',q.x,q.y+7)});
+      ctx.font='13px Jua, sans-serif';ctx.textAlign='center';s.mz.lanes.forEach((L,i)=>{[L.top,L.bot].forEach(([x,y])=>{ctx.fillStyle='rgba(29,26,58,.8)';ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.fill();ctx.fillStyle='#ffd47a';ctx.fillText(String(i+1),x,y+5)})});
       const drawDolls=()=>s.dl.forEach((q,i)=>{if(!avail(i))return;ctx.fillStyle='rgba(255,213,154,'+(.2+.12*Math.sin(t*4+i)).toFixed(2)+')';ctx.beginPath();ctx.arc(q.x,q.y,20,0,7);ctx.fill();drawToken(q.x,q.y,DOLLS[i],{scale:.72,bob:t*3+i})});drawDolls();
       const carry=(p)=>{if(p.c>=0)drawToken(p.x,p.y-PR-16,DOLLS[p.c],{scale:.55})};
       const vis=op.ok!==false&&hyp(op.x-m.x,op.y-m.y)<(th?LT:LG);
@@ -830,14 +840,13 @@ const StealG=(()=>{
       screen();if(!dark||dark.width!==cv.width||dark.height!==cv.height){dark=document.createElement('canvas');dark.width=cv.width;dark.height=cv.height}
       const dg=dark.getContext('2d');dg.globalCompositeOperation='source-over';dg.clearRect(0,0,dark.width,dark.height);dg.fillStyle=P==='intro'?'rgba(6,5,16,.35)':'rgba(6,5,16,.93)';dg.fillRect(0,0,dark.width,dark.height);dg.globalCompositeOperation='destination-out';
       const hole=(wx,wy,r)=>{const [x,y]=toS(wx,wy);const g=dg.createRadialGradient(x*dpr,y*dpr,r*z*dpr*.35,x*dpr,y*dpr,r*z*dpr);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');dg.fillStyle=g;dg.beginPath();dg.arc(x*dpr,y*dpr,r*z*dpr,0,7);dg.fill()};
-      hole(m.x,m.y,th?LT:LG);hole(bc(A0)[0],bc(A0)[1],70);hole(bc(A1)[0],bc(A1)[1],th?40:80);ctx.drawImage(dark,0,0,W,H);
+      hole(m.x,m.y,th?LT:LG);s.mz.safe.forEach(q=>hole(q.x,q.y,34));hole(bc(A0)[0],bc(A0)[1],70);hole(bc(A1)[0],bc(A1)[1],th?40:80);ctx.drawImage(dark,0,0,W,H);
       cam(cx,cy,z);if(P!=='intro'){ctx.globalAlpha=.85;drawDolls();ctx.globalAlpha=1}
       for(const p of C.parts)if(p.t==='step'){const a=p.life/p.max;ctx.strokeStyle='rgba(255,255,255,'+(a*.6).toFixed(2)+')';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,(1-a)*26+4,0,7);ctx.stroke()}
       drawBubble(m.x,m.y,C.bub.me,now);
       screen();ctx.font='13px Jua, sans-serif';ctx.textAlign='left';ctx.fillStyle='rgba(246,236,220,.7)';ctx.fillText('맵 · '+MAPS[s.mz.kind].n,16,H-26);ctx.textAlign='center';
       if(th){const goal=m.c>=0?bc(A0):bc(A1),[gx,gy]=toS(goal[0],goal[1]);drawPointer(gx,gy,null,m.c>=0?'#ff8a68':'#ffd59a',t,m.c>=0?'아지트':'인형')}
-      cam(cx,cy,z);ctx.font='15px Jua, sans-serif';ctx.textAlign='center';s.mz.lanes.forEach((L,i)=>{[L.top,L.bot].forEach(([x,y],k)=>{ctx.fillStyle='rgba(29,26,58,.85)';ctx.beginPath();ctx.arc(x,y+(k?T*.9:-T*.9),13,0,7);ctx.fill();ctx.fillStyle='#ffd47a';ctx.fillText(String(i+1),x,y+(k?T*.9:-T*.9)+5)})});
-      ctx.strokeStyle='rgba(183,170,255,.28)';ctx.lineWidth=2;s.mz.furn.forEach(f=>{rr(f.x*T+3,f.y*T+3,f.w*T-6,f.h*T-6,8);ctx.stroke()});screen()}
+      else{const [gx,gy]=toS(bc(A1)[0],bc(A1)[1]);drawPointer(gx,gy,null,'#ffd59a',t,'금고')}}
   }})();
 
 /* ================= 게임 6: 형 코골이 피하기 ================= */
