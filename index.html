@@ -748,11 +748,16 @@ const StealG=(()=>{
   const bc=b=>[(b.x0+b.x1+1)/2*T,(b.y0+b.y1+1)/2*T];
   const inB=(p,b)=>p.x>b.x0*T&&p.x<(b.x1+1)*T&&p.y>b.y0*T&&p.y<(b.y1+1)*T;
   let s=null,dark=null;
-  const MAPS=[{n:'형 방',d:'가구 사이로 살금살금'},{n:'두 갈래 길',d:'가운데 벽! 길은 왼쪽·오른쪽 두 개뿐'},{n:'꼬불꼬불 미로',d:'길이 꼬불꼬불, 길 잃지 않게!'},{n:'텅 빈 거실',d:'숨을 데가 없는 넓은 거실'}];
+  const MAPS=[{n:'형 방',d:'가구 사이로 살금살금'},{n:'두 갈래 길',d:'가운데 벽! 길은 왼쪽·오른쪽 두 개뿐'},{n:'꼬불꼬불 미로',d:'길이 꼬불꼬불, 길 잃지 않게!'},{n:'텅 빈 거실',d:'숨을 데가 없는 넓은 거실'},{n:'세 갈래 길',d:'길이 셋! 어느 길로 갈지 경비를 속여요'},{n:'네 개의 방',d:'방마다 인형이 있어요. 문은 몇 개뿐'}];
   function border(){const g=new Uint8Array(GW*GH);for(let x=0;x<GW;x++){g[x]=1;g[(GH-1)*GW+x]=1}for(let y=0;y<GH;y++){g[y*GW]=1;g[y*GW+GW-1]=1}return g}
   const baseFree=(x,y)=>B.some(b=>x>=b.x0-1&&x<=b.x1+1&&y>=b.y0-1&&y<=b.y1+1);
   function okConn(G){const d=gBfs(G,2,2);for(let i=0;i<GW*GH;i++)if(!G.g[i]&&d[i]<0)return false;return true}
-  function gen(seed){const kind=(seed>>>5)%4;let G;
+  function gen(seed){const kind=(seed>>>5)%6;let G;
+    if(kind===4){const r=mulberry32(seed^0x44),g=border(),furn=[];const xs=[5,9];xs.forEach(x=>furn.push({x,y:5,w:1,h:11,ty:'wall'}));
+      [[2,9],[11,10],[7,7],[7,13]].forEach(([x,y])=>{if(r()<.8)furn.push({x,y,w:1,h:1,ty:'plant'})});
+      for(const f of furn)for(let yy=f.y;yy<f.y+f.h;yy++)for(let xx=f.x;xx<f.x+f.w;xx++)g[yy*GW+xx]=1;G={w:GW,h:GH,g,furn,kind:4}}
+    else if(kind===5){const g=border(),furn=[];furn.push({x:7,y:1,w:1,h:4,ty:'wall'},{x:7,y:6,w:1,h:8,ty:'wall'},{x:7,y:15,w:1,h:5,ty:'wall'},{x:1,y:10,w:2,h:1,ty:'wall'},{x:4,y:10,w:3,h:1,ty:'wall'},{x:8,y:10,w:2,h:1,ty:'wall'},{x:11,y:10,w:3,h:1,ty:'wall'});
+      for(const f of furn)for(let yy=f.y;yy<f.y+f.h;yy++)for(let xx=f.x;xx<f.x+f.w;xx++)g[yy*GW+xx]=1;G={w:GW,h:GH,g,furn,kind:5}}
     if(kind===1){const r=mulberry32(seed^0x77),g=border(),furn=[];const y=Math.floor(GH/2);furn.push({x:3,y,w:GW-6,h:1,ty:'wall'});
       for(let i=0;i<3;i++){const x=4+Math.floor(r()*(GW-9)),yy=3+Math.floor(r()*4);if(!baseFree(x,yy)){furn.push({x,y:yy,w:2,h:1,ty:['desk','box','chair'][i%3]});furn.push({x:GW-1-(x+1),y:GH-1-yy,w:2,h:1,ty:['desk','box','chair'][i%3]})}}
       for(const f of furn)for(let yy=f.y;yy<f.y+f.h;yy++)for(let xx=f.x;xx<f.x+f.w;xx++)g[yy*GW+xx]=1;
@@ -776,7 +781,9 @@ const StealG=(()=>{
     return{w:GW,h:GH,g:border(),furn:[],basic:true,kind:0}}
   function dollsFor(seed,mz){const r=mulberry32(seed^0x0d011),[vx,vy]=bc(B[1]),d=[[vx-30,vy+4],[vx,vy+4],[vx+30,vy+4]].map(([x,y])=>({x,y}));
     const free=[];for(let y=3;y<GH-3;y++)for(let x=3;x<GW-3;x++)if(!mz.g[y*GW+x]&&!baseFree(x,y)&&!mz.g[y*GW+x-1]+!mz.g[y*GW+x+1]>=0)free.push([x,y]);shuffle(free,r);
-    const mid=free.filter(([x,y])=>hyp(x-GW/2,y-GH/2)<6);(mid.length>=2?mid:free).slice(0,2).forEach(([x,y])=>d.push({x:(x+.5)*T,y:(y+.5)*T}));return d}
+    d.splice(1,2);const pick=[];const far=(x,y)=>Math.min(hyp(x-2,y-2)/1.6,hyp(x-12,y-18),...pick.map(([a,b])=>hyp(x-a,y-b)));
+    for(let k=0;k<4;k++){let best=null,bv=-1;for(const [x,y] of free){const v=far(x,y)+r()*.5;if(v>bv){bv=v;best=[x,y]}}if(best)pick.push(best)}
+    pick.forEach(([x,y])=>d.push({x:(x+.5)*T,y:(y+.5)*T}));return d}
   const thiefIdx=r=>(r+s.first)%2,amThief=()=>thiefIdx(s.r)===s.o.me;
   const ph=now=>{const e=(now-s.rs)/1000;if(e<INTRO)return['intro',e];if(e<INTRO+PLAY)return['play',e-INTRO];return['end',e-INTRO-PLAY]};
   const thief=()=>amThief()?s.me:s.op,guard=()=>amThief()?s.op:s.me;
@@ -802,7 +809,7 @@ const StealG=(()=>{
       botGo(b,bt,goal[0],goal[1],s.od.speed*.92*(b.c>=0?.85:1)*(b.dash>0?1.9:1)*(b.st>0?.25:1),dt);thiefLogic(b,'op')}}
   return{
     id:'steal',name:'코츄 경찰과 도둑',btn:'멍!',stat:'run',stick:true,
-    rules:['한 명은 도둑, 한 명은 경비! 2판 하면서 역할을 바꿔요. 불 꺼진 방이라 내 주변만 보여요.','도둑: 금고와 방 가운데 있는 인형을 몰래 들고 아지트(왼쪽 위)로 가져가면 1개! 휙!(대시)으로 빠르게 도망가요.','경비: 도둑에게 닿으면 잡아서 아지트로 돌려보내요(인형은 제자리로). 멍!으로 도둑을 깜짝 놀래켜 멈추게 해요. 도둑일 때 더 많이 훔친 쪽이 승리!'],
+    rules:['한 명은 도둑, 한 명은 경비! 2판 하면서 역할을 바꿔요. 불 꺼진 방이라 내 주변만 보여요.','도둑: 방 곳곳(금고 포함 5곳)에 흩어진 인형을 몰래 들고 아지트(왼쪽 위)로 가져가면 1개! 길이 여러 갈래라 경비를 속일 수 있어요. 휙!(대시)으로 빠르게 도망가요.','경비: 도둑에게 닿으면 잡아서 아지트로 돌려보내요(인형은 제자리로). 멍!으로 도둑을 깜짝 놀래켜 멈추게 해요. 도둑일 때 더 많이 훔친 쪽이 승리!'],
     init(o){const mz=gen(o.seed);s={o,mz,dl:dollsFor(o.seed,mz),first:(o.seed>>>6)&1,r:0,score:[0,0],me:{},op:{ok:o.bot?true:undefined},d:derive(o.myC),od:derive(o.oppC),ended:false,endAt:0,bot:o.bot?{}:null,fsT:0,del:new Set()};newRound(o.now);bigText('맵: '+MAPS[mz.kind].n,true,1500)},
     step(dt,now,inp){if(s.ended)return;const [P,pe]=ph(now),m=s.me,op=s.op,th=amThief();
       if(P!==s.lastP){s.lastP=P;if(P==='play'){bigText(th?'훔쳐라!':'지켜라!',true,900);beep(660,.2,'triangle',.06)}if(P==='end')bigText('시간 끝!',true,1200)}
@@ -2175,35 +2182,45 @@ const GolfG=(()=>{
   const COURSES=[
     {w:380,h:640,tee:[0,250],cup:[0,-250],walls:[[-120,-40,240,24]],sand:[],name:'침대 밑'},
     {w:380,h:640,tee:[-120,250],cup:[120,-250],walls:[[-190,40,250,24],[-60,-120,250,24]],sand:[[60,140,70]],name:'책상 다리 사이'},
-    {w:380,h:640,tee:[0,260],cup:[0,-240],walls:[[-70,60,24,140],[46,-120,24,140],[-190,-40,90,24],[100,120,90,24]],sand:[[-110,-170,60],[120,40,55]],name:'장난감 숲'}];
-  function walls(c){const hw=c.w/2,hh=c.h/2,b=24;return c.walls.concat([[-hw-b,-hh-b,c.w+2*b,b],[-hw-b,hh,c.w+2*b,b],[-hw-b,-hh,b,c.h],[hw,-hh,b,c.h]])}
-  function physics(p,c,dt){if(p.inCup)return;const sp=hyp(p.vx,p.vy);if(sp<6){p.vx=p.vy=0;return}const sand=c.sand.some(([x,y,r])=>hyp(p.x-x,p.y-y)<r);const f=Math.exp(-(sand?3.2:1.05)*dt);p.vx*=f;p.vy*=f;
-    const n=Math.ceil(sp*dt/6);for(let k=0;k<n;k++){p.x+=p.vx*dt/n;p.y+=p.vy*dt/n;for(const [x,y,w,h] of walls(c)){const cx=clamp(p.x,x,x+w),cy=clamp(p.y,y,y+h),dx=p.x-cx,dy=p.y-cy,d=hyp(dx,dy);
+    {w:380,h:640,tee:[0,260],cup:[0,-240],walls:[[-70,60,24,140],[46,-120,24,140],[-190,-40,90,24],[100,120,90,24]],sand:[[-110,-170,60],[120,40,55]],name:'장난감 숲'},
+    {w:380,h:640,tee:[0,260],cup:[0,-250],walls:[],sand:[],water:[[-190,-60,150,150],[40,-60,150,150]],name:'욕조 연못 다리'},
+    {w:380,h:640,tee:[-120,260],cup:[120,-250],walls:[[-190,120,260,22]],sand:[[-100,-150,50]],mv:[[-60,-20,120,22,120,3.2]],name:'로봇청소기 지나간다'},
+    {w:380,h:640,tee:[0,260],cup:[0,-260],walls:[[-190,30,140,22],[50,30,140,22]],sand:[],boost:[[0,150,30,-Math.PI/2],[-120,-120,30,0],[120,-60,30,Math.PI]],name:'미끄럼 장판'},
+    {w:380,h:640,tee:[-120,260],cup:[130,-260],walls:[[-10,-320,22,640]],sand:[[-120,-100,50]],warp:[[[-130,-220],[120,220]]],name:'형 이불 터널'},
+    {w:380,h:640,tee:[-130,270],cup:[130,-260],walls:[[-190,160,280,22],[-90,40,280,22],[-190,-80,280,22],[-90,-200,280,22]],sand:[],name:'꼬불 지그재그'},
+    {w:380,h:640,tee:[0,270],cup:[0,-200],walls:[],sand:[[0,-200,95]],water:[[-190,-110,130,60],[60,-110,130,60],[-60,-320,120,40]],boost:[[0,80,28,-Math.PI/2]],name:'도토리 섬'}];
+  const CS=h=>COURSES[s.cs[h]];
+  function walls(c,el){const hw=c.w/2,hh=c.h/2,b=24,mv=(c.mv||[]).map(([x,y,w,h,dx,per])=>[x+Math.sin((el||0)*6.283/per)*dx,y,w,h]);return c.walls.concat(mv,[[-hw-b,-hh-b,c.w+2*b,b],[-hw-b,hh,c.w+2*b,b],[-hw-b,-hh,b,c.h],[hw,-hh,b,c.h]])}
+  function physics(p,c,dt,el,who){if(p.inCup)return;special(p,c,dt,who);const sp=hyp(p.vx,p.vy);if(sp<6){p.vx=p.vy=0;return}const sand=c.sand.some(([x,y,r])=>hyp(p.x-x,p.y-y)<r);const f=Math.exp(-(sand?3.2:1.05)*dt);p.vx*=f;p.vy*=f;
+    const n=Math.ceil(sp*dt/6);for(let k=0;k<n;k++){p.x+=p.vx*dt/n;p.y+=p.vy*dt/n;for(const [x,y,w,h] of walls(c,el)){const cx=clamp(p.x,x,x+w),cy=clamp(p.y,y,y+h),dx=p.x-cx,dy=p.y-cy,d=hyp(dx,dy);
       if(d<BR&&d>.0001){const nx=dx/d,ny=dy/d;p.x=cx+nx*BR;p.y=cy+ny*BR;const dot=p.vx*nx+p.vy*ny;if(dot<0){p.vx-=1.75*dot*nx;p.vy-=1.75*dot*ny;if(Math.abs(dot)>60)beep(300,.03,'square',.03)}}}}
     const [qx,qy]=c.cup,dd=hyp(p.x-qx,p.y-qy);if(dd<14&&hyp(p.vx,p.vy)<520){p.inCup=true;p.x=qx;p.y=qy;p.vx=p.vy=0}else if(dd<40){p.vx+=(qx-p.x)*dt*2;p.vy+=(qy-p.y)*dt*2}}
-  function newHole(p,h){const c=COURSES[h];p.hole=h;p.x=c.tee[0]+(p.side*14);p.y=c.tee[1];p.vx=p.vy=0;p.st=0;p.inCup=false;p.aim=-Math.PI/2}
+  function special(p,c,dt,who){(c.boost||[]).forEach(([x,y,r,a])=>{if(hyp(p.x-x,p.y-y)<r){const v=Math.max(460,hyp(p.vx,p.vy));p.vx=Math.cos(a)*v;p.vy=Math.sin(a)*v}});
+    p.wcd=Math.max(0,(p.wcd||0)-dt);(c.warp||[]).forEach(([u,v])=>{[[u,v],[v,u]].forEach(([a,b])=>{if(p.wcd<=0&&hyp(p.x-a[0],p.y-a[1])<16){p.x=b[0];p.y=b[1];p.wcd=.8;ring(b[0],b[1],'#b79cff',40);if(who==='me')beep(620,.1,'sine',.05)}})});
+    if(hyp(p.vx,p.vy)<200)(c.water||[]).forEach(([x,y,w,h])=>{if(p.x>x&&p.x<x+w&&p.y>y&&p.y<y+h){p.x=p.lx;p.y=p.ly;p.vx=p.vy=0;p.st++;bubble(who,'퐁당! +1타',1);if(who==='me')beep(200,.2,'sine',.06)}})}
+  function newHole(p,h){const c=CS(h);p.hole=h;p.x=c.tee[0]+(p.side*14);p.y=c.tee[1];p.vx=p.vy=0;p.st=0;p.inCup=false;p.aim=-Math.PI/2}
   const total=p=>p.strokes.reduce((a,b)=>a+b,0);
   function sunk(p,who){p.strokes[p.hole]=p.st;bubble(who,p.st===1?'홀인원!':p.st+'타만에 쏙!',1.3);if(who==='me'){beep(990,.15,'triangle',.07);setTimeout(()=>beep(1320,.2,'triangle',.07),110);confetti(p.x,p.y,24)}
     if(p.hole+1<HOLES){p.wait=1.2}else p.done=true}
   return{
     id:'golf',name:'도토리 미니 골프',btn:'치기',stat:null,stick:true,
-    rules:['형 방 바닥에서 도토리를 굴려 컵에 넣어요. 3홀 동안 친 횟수가 적은 쪽이 이겨요.','화면을 밀어서 방향을 정하고, 버튼을 꾹 누르면 힘이 차올라요. 떼는 순간 쳐요.','모래(러그)는 느려지고 벽에 맞으면 튕겨요. 한 홀에 7번까지예요. 같은 홀이면 상대 도토리를 맞혀 밀어낼 수도 있어요.'],
-    init(o){const mk=sd=>({x:0,y:0,vx:0,vy:0,hole:0,st:0,strokes:[],inCup:false,aim:-Math.PI/2,side:sd,done:false,wait:0});s={o,t0:o.now,me:mk(o.me?1:-1),op:Object.assign(mk(o.me?-1:1),{ok:true}),charging:false,pw:0,pwT:0,ended:false,endAt:0,bot:o.bot?{t:1.5}:null};
+    rules:['형 방 바닥에서 도토리를 굴려 컵에 넣어요. 3홀 동안 친 횟수가 적은 쪽이 이겨요.','화면을 밀어서 방향을 정하고, 버튼을 꾹 누르면 힘이 차올라요. 떼는 순간 쳐요.','코스는 9개 중 3개가 랜덤! 모래는 느려지고, 물에 빠지면 +1타, 화살표 장판은 쭉 밀어주고, 이불 터널은 순간이동, 로봇청소기는 움직여요. 한 홀에 7번까지예요.'],
+    init(o){const rr0=mulberry32(o.seed^0x601f),cs=shuffle([0,1,2,3,4,5,6,7,8],rr0).slice(0,3);const mk=sd=>({x:0,y:0,vx:0,vy:0,hole:0,st:0,strokes:[],inCup:false,aim:-Math.PI/2,side:sd,done:false,wait:0});s={o,cs,t0:o.now,me:mk(o.me?1:-1),op:Object.assign(mk(o.me?-1:1),{ok:true}),charging:false,pw:0,pwT:0,ended:false,endAt:0,bot:o.bot?{t:1.5}:null};
       newHole(s.me,0);newHole(s.op,0)},
-    step(dt,now,inp){const el=(now-s.t0)/1000,m=s.me,op=s.op,c=COURSES[m.hole];
+    step(dt,now,inp){const el=(now-s.t0)/1000,m=s.me,op=s.op,c=CS(m.hole);
       if(!s.ended&&((m.done&&op.done)||el*1000>=TMAX)){s.ended=true;s.endAt=now}
       if(s.ended)return;
-      if(m.wait>0){m.wait-=dt;if(m.wait<=0){newHole(m,m.hole+1);bigText((m.hole+1)+'번 홀 · '+COURSES[m.hole].name,true,1000)}}
+      if(m.wait>0){m.wait-=dt;if(m.wait<=0){newHole(m,m.hole+1);bigText((m.hole+1)+'번 홀 · '+CS(m.hole).name,true,1000)}}
       const still=!m.inCup&&!m.done&&hyp(m.vx,m.vy)<6&&m.wait<=0;
       if(inp.mag>.3)m.aim=Math.atan2(inp.my,inp.mx);
       if(still&&inp.held){if(!s.charging){s.charging=true;s.pwT=0}s.pwT+=dt;s.pw=.5-.5*Math.cos(s.pwT*Math.PI*1.25)}
-      if(s.charging&&(!inp.held||!still)){if(still){const v=110+s.pw*800;m.vx=Math.cos(m.aim)*v;m.vy=Math.sin(m.aim)*v;m.st++;beep(500,.06,'triangle',.06)}s.charging=false;s.pw=0}
-      physics(m,c,dt);if(op.ok&&op.hole===m.hole&&!op.inCup&&!m.inCup){const dx=m.x-op.x,dy=m.y-op.y,d=hyp(dx,dy);if(d<BR*2&&d>.01){m.x+=dx/d*(BR*2-d);m.y+=dy/d*(BR*2-d);const v=hyp(op.vx||0,op.vy||0);m.vx+=dx/d*v*.6;m.vy+=dy/d*v*.6}}
+      if(s.charging&&(!inp.held||!still)){if(still){const v=110+s.pw*800;m.lx=m.x;m.ly=m.y;m.vx=Math.cos(m.aim)*v;m.vy=Math.sin(m.aim)*v;m.st++;beep(500,.06,'triangle',.06)}s.charging=false;s.pw=0}
+      physics(m,c,dt,el,'me');if(op.ok&&op.hole===m.hole&&!op.inCup&&!m.inCup){const dx=m.x-op.x,dy=m.y-op.y,d=hyp(dx,dy);if(d<BR*2&&d>.01){m.x+=dx/d*(BR*2-d);m.y+=dy/d*(BR*2-d);const v=hyp(op.vx||0,op.vy||0);m.vx+=dx/d*v*.6;m.vy+=dy/d*v*.6}}
       if(m.inCup&&m.strokes[m.hole]==null)sunk(m,'me');if(!m.inCup&&!m.done&&m.st>=MAXS&&hyp(m.vx,m.vy)<6){m.st=MAXS+1;m.inCup=true;bubble('me','7타 초과! 다음 홀',1);sunk(m,'me')}
-      if(s.bot){const b=op,bc=COURSES[b.hole],bt=s.bot;if(b.wait>0){b.wait-=dt;if(b.wait<=0)newHole(b,b.hole+1)}
-        if(!b.inCup&&!b.done&&b.wait<=0&&hyp(b.vx,b.vy)<6){bt.t-=dt;if(bt.t<=0){bt.t=1.2+Math.random();const [qx,qy]=bc.cup;let tx=qx,ty=qy;const blocked=walls(bc).slice(0,bc.walls.length).some(([x,y,w,h])=>{for(let k=1;k<10;k++){const px=b.x+(qx-b.x)*k/10,py=b.y+(qy-b.y)*k/10;if(px>x-BR&&px<x+w+BR&&py>y-BR&&py<y+h+BR)return true}return false});
-          if(blocked){tx=b.x+(Math.random()<.5?-1:1)*140;ty=b.y-200}const a=Math.atan2(ty-b.y,tx-b.x)+gauss(Math.random)*.06,d=hyp(tx-b.x,ty-b.y),v=clamp(Math.sqrt(d)*34+gauss(Math.random)*40,110,910);b.vx=Math.cos(a)*v;b.vy=Math.sin(a)*v;b.st++}}
-        physics(b,bc,dt);if(b.inCup&&b.strokes[b.hole]==null)sunk(b,'op');if(!b.inCup&&!b.done&&b.st>=MAXS&&hyp(b.vx,b.vy)<6){b.st=MAXS+1;b.inCup=true;sunk(b,'op')}}
+      if(s.bot){const b=op,bc=CS(b.hole),bt=s.bot;if(b.wait>0){b.wait-=dt;if(b.wait<=0)newHole(b,b.hole+1)}
+        if(!b.inCup&&!b.done&&b.wait<=0&&hyp(b.vx,b.vy)<6){bt.t-=dt;if(bt.t<=0){bt.t=1.2+Math.random();const [qx,qy]=bc.cup;let tx=qx,ty=qy;const blocked=walls(bc,el).slice(0,bc.walls.length+(bc.mv||[]).length).some(([x,y,w,h])=>{for(let k=1;k<10;k++){const px=b.x+(qx-b.x)*k/10,py=b.y+(qy-b.y)*k/10;if(px>x-BR&&px<x+w+BR&&py>y-BR&&py<y+h+BR)return true}return false});
+          if(blocked){tx=b.x+(Math.random()<.5?-1:1)*140;ty=b.y-200}const a=Math.atan2(ty-b.y,tx-b.x)+gauss(Math.random)*.06,d=hyp(tx-b.x,ty-b.y),v=clamp(Math.sqrt(d)*34+gauss(Math.random)*40,110,910);b.lx=b.x;b.ly=b.y;b.vx=Math.cos(a)*v;b.vy=Math.sin(a)*v;b.st++}}
+        physics(b,bc,dt,el,'op');if(b.inCup&&b.strokes[b.hole]==null)sunk(b,'op');if(!b.inCup&&!b.done&&b.st>=MAXS&&hyp(b.vx,b.vy)<6){b.st=MAXS+1;b.inCup=true;sunk(b,'op')}}
       else smooth(op,dt,16)},
     onRemote(g){const h=clamp(Math.floor(num(g.h)),0,HOLES-1);if(h!==s.op.hole){s.op.hole=h;s.op.x=num(g.x);s.op.y=num(g.y)}remoteTo(s.op,g,-400,-400,400,400);s.op.st=clamp(Math.floor(num(g.st)),0,9);s.op.inCup=!!g.ic;s.op.done=!!g.dn;s.op.vx=num(g.vx);s.op.vy=num(g.vy);
       if(Array.isArray(g.sk))s.op.strokes=g.sk.slice(0,HOLES).map(v=>clamp(Math.floor(num(v,8)),1,8))},
@@ -2213,12 +2230,15 @@ const GolfG=(()=>{
     summary(){return'총 타수 나 '+total(s.me)+'타 · '+opName()+' '+total(s.op)+'타'},
     hud(now){return{t:(s.me.hole+1)+'/'+HOLES+'홀',c:'나 '+(total(s.me)+(s.me.inCup?0:s.me.st))+'타 · '+opName()+' '+(total(s.op)+(s.op.inCup?0:s.op.st))+'타'+(s.op.hole!==s.me.hole?' ('+(s.op.hole+1)+'홀)':''),cls:'go'}},
     button(){const m=s.me,still=!m.inCup&&!m.done&&hyp(m.vx,m.vy)<6;return{label:m.done?'끝!':(still?'치기':'…'),off:!still}},
-    draw(now){const t=now/1000,m=s.me,c=COURSES[m.hole],z=Math.min(W/(c.w+70),(H-170)/(c.h+70));
+    draw(now){const t=now/1000,el=(now-s.t0)/1000,m=s.me,c=CS(m.hole),z=Math.min(W/(c.w+70),(H-170)/(c.h+70));
       screen();ctx.fillStyle='#2a2140';ctx.fillRect(0,0,W,H);cam(0,0,z,0,14);ctx.fillStyle=pat(PLANK);ctx.fillRect(-W/z,-H/z,W*2/z,H*2/z);
       ctx.fillStyle='rgba(0,0,0,.35)';rr(-c.w/2-6,-c.h/2-2,c.w+12,c.h+12,18);ctx.fill();ctx.fillStyle='#5fae58';rr(-c.w/2,-c.h/2,c.w,c.h,16);ctx.fill();
       ctx.fillStyle='rgba(255,255,255,.05)';for(let y=-c.h/2;y<c.h/2;y+=40)ctx.fillRect(-c.w/2,y,c.w,20);
       c.sand.forEach(([x,y,r])=>{ctx.fillStyle='#844862';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.strokeStyle='#e9c46a';ctx.lineWidth=3;ctx.stroke()});
-      walls(c).forEach(([x,y,w,h],i)=>{ctx.fillStyle=i<c.walls.length?'#b27c49':'#6f4526';rr(x,y,w,h,6);ctx.fill();ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(x+3,y+3,w-6,3)});
+      (c.water||[]).forEach(([x,y,w,h])=>{ctx.fillStyle='#4a8fd6';rr(x,y,w,h,14);ctx.fill();ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=2;for(let k=0;k<3;k++){const yy=y+h*(k+1)/4;ctx.beginPath();ctx.moveTo(x+10,yy+Math.sin(t*2+k)*3);ctx.quadraticCurveTo(x+w/2,yy-6,x+w-10,yy+Math.sin(t*2+k+1)*3);ctx.stroke()}ctx.fillStyle='#fff';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('🦆',x+w/2+Math.sin(t)*w*.3,y+h/2+6)});
+      (c.boost||[]).forEach(([x,y,r,a])=>{ctx.fillStyle='rgba(255,212,122,.35)';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.fillStyle='#ffd47a';const o=(t*30)%14;for(let k=-1;k<=1;k++){ctx.beginPath();ctx.moveTo(k*12+o-4,-10);ctx.lineTo(k*12+o+6,0);ctx.lineTo(k*12+o-4,10);ctx.lineTo(k*12+o-8,10);ctx.lineTo(k*12+o+2,0);ctx.lineTo(k*12+o-8,-10);ctx.fill()}ctx.restore()});
+      (c.warp||[]).forEach(pr=>pr.forEach(([x,y])=>{ctx.fillStyle='#2b2643';ctx.beginPath();ctx.ellipse(x,y,20,14,0,0,7);ctx.fill();ctx.strokeStyle='#b79cff';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(x,y,20+Math.sin(t*4)*2,14,0,0,7);ctx.stroke()}));
+      walls(c,el).forEach(([x,y,w,h],i)=>{const isMv=i>=c.walls.length&&i<c.walls.length+(c.mv||[]).length;if(isMv){ctx.fillStyle='#3a3a44';ctx.beginPath();ctx.arc(x+w/2,y+h/2,30,0,7);ctx.fill();ctx.fillStyle='#7ec6ff';ctx.beginPath();ctx.arc(x+w/2,y+h/2,8,0,7);ctx.fill();ctx.fillStyle='rgba(255,255,255,.3)';rr(x,y,w,h,8);ctx.fill();return}ctx.fillStyle=i<c.walls.length?'#b27c49':'#6f4526';rr(x,y,w,h,6);ctx.fill();ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(x+3,y+3,w-6,3)});
       const [qx,qy]=c.cup;ctx.fillStyle='#17152b';ctx.beginPath();ctx.arc(qx,qy,13,0,7);ctx.fill();ctx.strokeStyle='#f6ecdc';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(qx,qy);ctx.lineTo(qx,qy-46);ctx.stroke();ctx.fillStyle='#ff5a5f';ctx.beginPath();ctx.moveTo(qx,qy-46);ctx.lineTo(qx+22,qy-39);ctx.lineTo(qx,qy-32);ctx.fill();
       const ball=(p,col,ci,lbl)=>{if(p.inCup&&p.done)return;ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(p.x+2,p.y+6,BR,BR*.5,0,0,7);ctx.fill();drawAcorn(p.x,p.y-2,0,1.2);ctx.strokeStyle=col;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(p.x,p.y,BR+4,0,7);ctx.stroke();
         ctx.font='11px Jua, sans-serif';ctx.textAlign='center';ctx.fillStyle=col;ctx.fillText(lbl,p.x,p.y-BR-14)};
