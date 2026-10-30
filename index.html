@@ -744,7 +744,9 @@ const TowerG=(()=>{
 /* ================= 게임 5: 코츄 몰래 훔치기 ================= */
 const StealG=(()=>{
   const T=40,GW=15,GH=21,NR=2,INTRO=2.8,PLAY=35,END=2.6,LT=145,LG=165,BR=95,CATCH=PR*2+6,DOLLS=[2,3,4,0,1];
-  const B=[{x0:1,y0:1,x1:3,y1:3,name:'도둑 아지트'},{x0:GW-4,y0:GH-4,x1:GW-2,y1:GH-2,name:'인형 금고'}];
+  const B=[{x0:1,y0:1,x1:3,y1:3,name:'도둑 아지트'},{x0:GW-4,y0:GH-4,x1:GW-2,y1:GH-2,name:'인형 금고'},{x0:GW-4,y0:1,x1:GW-2,y1:3,name:'도둑 아지트 2'}];
+  const HIDES=[0,2],inHide=p=>HIDES.some(i=>inB(p,B[i]));
+  const ITEMS={shoe:{e:'👟',n:'신발',d:'3초 빨라짐'},torch:{e:'🔦',n:'손전등',d:'4초 동안 상대 위치가 보여요'},cloak:{e:'🫥',n:'이불 망토',d:'3초 동안 안 보여요'},glue:{e:'🍯',n:'꿀단지',d:'내 자리에 끈끈이! 상대가 밟으면 2초 멈춤'}};
   const bc=b=>[(b.x0+b.x1+1)/2*T,(b.y0+b.y1+1)/2*T];
   const inB=(p,b)=>p.x>b.x0*T&&p.x<(b.x1+1)*T&&p.y>b.y0*T&&p.y<(b.y1+1)*T;
   let s=null,dark=null;
@@ -765,53 +767,60 @@ const StealG=(()=>{
     [[5,2,2,1],[10,3,2,1],[4,18,2,1],[8,17,1,1]].forEach(([x,y,w,h],i)=>{if(r()<.7&&!B.some(b=>x+w>b.x0-1&&x<=b.x1+1&&y+h>b.y0-1&&y<=b.y1+1)){for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)g[ix(xx,yy)]=1;merged.push({x,y,w,h,ty:FT[(i+2)%5]})}});
     const lanes=[];LN.forEach((x,i)=>{if(i>0&&LN[i-1]===x-1)return;const w=LN.includes(x+1)?2:1,cx=(x+w/2)*T;lanes.push({top:[cx,(Y0+.5)*T],bot:[cx,(Y1+.5)*T],mid:[cx,((Y0+Y1)/2+.5)*T]})});
     return{w:GW,h:GH,g,furn:merged,kind,safe,lanes}}
-  function dollsFor(seed,mz){const [vx,vy]=bc(B[1]);return[[vx,vy+6],[2.5*T,18.5*T],[6.5*T,17.5*T],[9.5*T,18.5*T],[12.5*T,2.5*T]].map(([x,y])=>({x,y}))}
+  function dollsFor(seed,mz){const [vx,vy]=bc(B[1]);return[[vx,vy+6],[2.5*T,18.5*T],[6.5*T,17.5*T],[9.5*T,18.5*T],[4.5*T,3.5*T]].map(([x,y])=>({x,y}))}
+  function itemPlan(seed,mz){const r=mulberry32(seed^0x17e3),free=[];for(let y=2;y<GH-2;y++)for(let x=1;x<GW-1;x++)if(!mz.g[y*GW+x]&&!B.some(b=>x>=b.x0-1&&x<=b.x1+1&&y>=b.y0-1&&y<=b.y1+1)&&!mz.safe.some(q=>hyp(q.x-(x+.5)*T,q.y-(y+.5)*T)<T*1.5))free.push([x,y]);shuffle(free,r);
+    const ks=['shoe','torch','cloak','glue'],out=[];let t=3;for(let i=0;i<9&&i<free.length;i++){const [x,y]=free[i];out.push({t,x:(x+.5)*T,y:(y+.5)*T,k:ks[Math.floor(r()*4)]});t+=3.5+r()*2}return out}
+  function useItem(p,who,k,now){p.fx=p.fx||{};if(k==='shoe')p.fx.shoe=now+3000;else if(k==='torch')p.fx.torch=now+4000;else if(k==='cloak')p.fx.cloak=now+3000;else if(k==='glue'){s.glue.push({x:p.x,y:p.y,by:p,t:now});if(who==='me'&&!s.o.bot)sendEv({k:'gl',p:s.r,x:Math.round(p.x),y:Math.round(p.y)})}
+    const it=ITEMS[k];bubble(who,it.e+' '+it.n+'!',1.1);if(who==='me'){beep(880,.12,'triangle',.06);bigText(it.e+' '+it.d,true,1100)}}
+  function itemPick(p,who,now){const el=(now-s.rs)/1000-INTRO;s.it.forEach((q,i)=>{if(s.got.has(i)||el<q.t||el>q.t+14)return;if(hyp(q.x-p.x,q.y-p.y)<PR+14){s.got.add(i);useItem(p,who,q.k,now);ring(q.x,q.y,'#ffd47a',40);if(who==='me'&&!s.o.bot)sendEv({k:'it',p:s.r,i})}})}
+  function glueStep(p,who,now){s.glue.forEach(g=>{if(g.by===p||g.hit)return;if(hyp(g.x-p.x,g.y-p.y)<PR+10){g.hit=now;p.st=Math.max(p.st,2);bubble(who,'끈끈해!',1);if(who==='me'){C.shake=.2;beep(180,.2,'sawtooth',.05)}}});s.glue=s.glue.filter(g=>!g.hit||now-g.hit<800)}
+  const fxOn=(p,k,now)=>!!(p.fx&&p.fx[k]&&p.fx[k]>now);
   const inSafe=p=>s.mz.safe.some(q=>hyp(p.x-q.x,p.y-q.y)<T*.62);
-  function pushOut(p){s.mz.safe.forEach(q=>{const dx=p.x-q.x,dy=p.y-q.y,d=hyp(dx,dy)||1;if(d<T*.8){p.x=q.x+dx/d*T*.8;p.y=q.y+dy/d*T*.8}});const b=B[0];if(inB(p,b)){const ex=(b.x1+1)*T+PR-p.x,ey=(b.y1+1)*T+PR-p.y;if(ex<ey)p.x+=ex;else p.y+=ey}}
+  function pushOut(p){s.mz.safe.forEach(q=>{const dx=p.x-q.x,dy=p.y-q.y,d=hyp(dx,dy)||1;if(d<T*.8){p.x=q.x+dx/d*T*.8;p.y=q.y+dy/d*T*.8}});HIDES.forEach(i=>{const b=B[i],x0=(b.x0-1)*T,y0=(b.y0-1)*T,x1=(b.x1+2)*T,y1=(b.y1+2)*T;if(p.x>x0&&p.x<x1&&p.y>y0&&p.y<y1){const c=[[p.x-x0,-1,0],[x1-p.x,1,0],[p.y-y0,0,-1],[y1-p.y,0,1]].filter(([d,dx,dy])=>!(dx&&(b.x0===1?dx<0:dx>0))&&!(dy<0)).sort((a,b)=>a[0]-b[0])[0];if(c){p.x+=c[1]*(c[0]+PR);p.y+=c[2]*(c[0]+PR)}}})}
   const thiefIdx=r=>(r+s.first)%2,amThief=()=>thiefIdx(s.r)===s.o.me;
   const ph=now=>{const e=(now-s.rs)/1000;if(e<INTRO)return['intro',e];if(e<INTRO+PLAY)return['play',e-INTRO];return['end',e-INTRO-PLAY]};
   const thief=()=>amThief()?s.me:s.op,guard=()=>amThief()?s.op:s.me;
   const avail=i=>!s.del.has(i)&&thief().c!==i;
-  function newRound(now){s.rs=now;s.del=new Set();const th=amThief(),[tx,ty]=bc(B[0]),[gx,gy]=bc(B[1]);
+  function newRound(now){s.rs=now;s.del=new Set();s.it=itemPlan(s.o.seed+s.r*131,s.mz);s.got=new Set();s.glue=[];s.me.fx={};s.op.fx={};const th=amThief(),[tx,ty]=bc(B[0]),[gx,gy]=bc(B[1]);
     Object.assign(s.me,{x:th?tx:gx,y:th?ty-30:gy-40,c:-1,st:0,dash:0,kx:0,ky:0});Object.assign(s.op,{x:th?gx:tx,y:th?gy-40:ty-30,c:-1,st:0,dash:0,kx:0,ky:0,tx:null});s.cd=0;s.ccd=0;s.caught=0;s.lastP='';
     if(s.bot)Object.assign(s.bot,{cd:1.5,dm:null,dT:0,nav:{},goal:null,pat:0});bigText((s.r+1)+'판 · '+(th?'나는 도둑! 인형을 훔쳐요':'나는 경비! 도둑을 잡아요'),true,2200,!th)}
   function deliver(p,who){if(p.c<0)return;s.del.add(p.c);p.c=-1;s.score[thiefIdx(s.r)]++;bubble(who,'훔쳤다!',1.1);if(who==='me'){confetti(p.x,p.y,24);beep(990,.15,'triangle',.07)}bigText((who==='me'?'성공! ':opName()+' 성공 · ')+s.score[thiefIdx(s.r)]+'개째',true,1000,who!=='me')}
-  function caughtT(p,who){const [tx,ty]=bc(B[0]);p.c=-1;p.x=tx;p.y=ty-30;p.kx=p.ky=0;p.st=1.4;s.caught++;bubble(who,'잡혔다!',1.2);ring(p.x,p.y,'#ff5a5f',70);if(who==='me'){C.shake=.35;beep(150,.3,'sawtooth',.06);bigText('잡혔다! 아지트로 돌아가요',true,1200,true)}else{beep(880,.2,'triangle',.07);bigText('잡았다! 코츄!',true,1000)}}
+  function caughtT(p,who){const [tx,ty]=bc(B[p.x>GW*T/2?2:0]);p.c=-1;p.x=tx;p.y=ty-30;p.kx=p.ky=0;p.st=1.4;s.caught++;bubble(who,'잡혔다!',1.2);ring(p.x,p.y,'#ff5a5f',70);if(who==='me'){C.shake=.35;beep(150,.3,'sawtooth',.06);bigText('잡혔다! 아지트로 돌아가요',true,1200,true)}else{beep(880,.2,'triangle',.07);bigText('잡았다! 코츄!',true,1000)}}
   function barkHit(p,x,y,who){if(hyp(p.x-x,p.y-y)<BR){p.st=Math.max(p.st,1.1);bubble(who,'깜짝!',.8);if(who==='me'){C.shake=.2;beep(180,.15,'sawtooth',.05)}}}
-  function thiefLogic(p,who){if(p.c<0){for(let i=0;i<s.dl.length;i++)if(avail(i)&&hyp(s.dl[i].x-p.x,s.dl[i].y-p.y)<PR+12){p.c=i;bubble(who,'슬쩍!',.9);if(who==='me')beep(880,.1,'triangle',.05);break}}if(p.c>=0&&inB(p,B[0]))deliver(p,who)}
+  function thiefLogic(p,who){if(p.c<0){for(let i=0;i<s.dl.length;i++)if(avail(i)&&hyp(s.dl[i].x-p.x,s.dl[i].y-p.y)<PR+12){p.c=i;bubble(who,'슬쩍!',.9);if(who==='me')beep(880,.1,'triangle',.05);break}}if(p.c>=0&&inHide(p))deliver(p,who)}
   function botGo(b,bt,gx,gy,sp,dt){const gk=Math.floor(gx/T)+','+Math.floor(gy/T);bt.dT-=dt;if(bt.goal!==gk||bt.dT<=0||!bt.dm){bt.goal=gk;bt.dT=.4;bt.dm=gBfs(s.mz,Math.floor(gx/T),Math.floor(gy/T))}
     let tx=gx,ty=gy;if(hyp(gx-b.x,gy-b.y)>T*1.1){const tg=gStep(s.mz,T,b,bt.dm,true,bt.nav,dt);if(tg){tx=tg[0];ty=tg[1]}}botWalk(b,tx,ty,sp,dt);gResolve(s.mz,b,T)}
   function stepBot(dt,now){const b=s.op,bt=s.bot,m=s.me;b.st=Math.max(0,b.st-dt);bt.cd=Math.max(0,bt.cd-dt);b.dash=Math.max(0,b.dash-dt);const d=hyp(m.x-b.x,m.y-b.y);
     if(amThief()){// 봇 = 경비
-      let gx,gy;if(d<LG*.9){gx=m.x;gy=m.y}else{const pts=[bc(B[1]),...s.dl.filter((_,i)=>avail(i)).map(q=>[q.x,q.y])];const q=pts[Math.floor(bt.pat)%pts.length];gx=q[0];gy=q[1];if(hyp(gx-b.x,gy-b.y)<T)bt.pat+=1+Math.floor(Math.random()*2)}
-      botGo(b,bt,gx,gy,s.od.speed*.9*(b.st>0?.25:1),dt);
+      const seeM=(d<LG*.9&&!fxOn(m,'cloak',now))||fxOn(b,'torch',now);let gx,gy;if(seeM){gx=m.x;gy=m.y}else{const pts=[bc(B[1]),...s.dl.filter((_,i)=>avail(i)).map(q=>[q.x,q.y])];const q=pts[Math.floor(bt.pat)%pts.length];gx=q[0];gy=q[1];if(hyp(gx-b.x,gy-b.y)<T)bt.pat+=1+Math.floor(Math.random()*2)}
+      itemPick(b,'op',now);glueStep(b,'op',now);botGo(b,bt,gx,gy,s.od.speed*.9*(fxOn(b,'shoe',now)?1.5:1)*(b.st>0?.25:1),dt);
       if(bt.cd<=0&&d<BR*.8&&Math.random()<dt*3){bt.cd=4;bubble('op','멍!',1);ring(b.x,b.y,'#7ec6ff',BR);barkHit(m,b.x,b.y,'me')}
-      if(s.ccd<=0&&d<CATCH&&!inSafe(m)&&!inB(m,B[0])){s.ccd=2;caughtT(m,'me')}pushOut(b);gResolve(s.mz,b,T)}
+      if(s.ccd<=0&&d<CATCH&&!inSafe(m)&&!inHide(m)){s.ccd=2;caughtT(m,'me')}pushOut(b);gResolve(s.mz,b,T)}
     else{// 봇 = 도둑
-      let goal;if(b.c>=0)goal=bc(B[0]);else{let best=null,bd=1e9;s.dl.forEach((q,i)=>{if(!avail(i))return;const dd=hyp(q.x-b.x,q.y-b.y)+(d<160?-hyp(q.x-m.x,q.y-m.y)*.6:0);if(dd<bd){bd=dd;best=q}});goal=best?[best.x,best.y]:bc(B[0])}
+      let goal;if(b.c>=0)goal=bc(B[hyp(b.x-bc(B[0])[0],b.y-bc(B[0])[1])<hyp(b.x-bc(B[2])[0],b.y-bc(B[2])[1])?0:2]);else{let best=null,bd=1e9;s.dl.forEach((q,i)=>{if(!avail(i))return;const dd=hyp(q.x-b.x,q.y-b.y)+(d<160?-hyp(q.x-m.x,q.y-m.y)*.6:0);if(dd<bd){bd=dd;best=q}});goal=best?[best.x,best.y]:bc(B[0])}
       if(bt.cd<=0&&d<120){bt.cd=4;b.dash=.5;bubble('op','휙!',.6)}
       if(bt.wpFor!==b.c){bt.wpFor=b.c;bt.wp=s.mz.lanes[Math.floor(Math.random()*s.mz.lanes.length)].mid}if(bt.wp&&hyp(bt.wp[0]-b.x,bt.wp[1]-b.y)<T*.8)bt.wp=null;if(bt.wp)goal=bt.wp;
-      botGo(b,bt,goal[0],goal[1],s.od.speed*.92*(b.c>=0?.85:1)*(b.dash>0?1.9:1)*(b.st>0?.25:1),dt);thiefLogic(b,'op')}}
+      itemPick(b,'op',now);glueStep(b,'op',now);botGo(b,bt,goal[0],goal[1],s.od.speed*.92*(fxOn(b,'shoe',now)?1.5:1)*(b.c>=0?.85:1)*(b.dash>0?1.9:1)*(b.st>0?.25:1),dt);thiefLogic(b,'op')}}
   return{
     id:'steal',name:'코츄 경찰과 도둑',btn:'멍!',stat:'run',stick:true,
-    rules:['한 명은 도둑, 한 명은 경비! 2판 하면서 역할을 바꿔요. 불 꺼진 방이라 내 주변만 보여요.','도둑: 인형 5개(금고와 방 곳곳)를 몰래 들고 아지트(왼쪽 위)로 가져가면 1개! 가구 사이 갈래길(1·2·3…)과 샛길로 경비를 속여요. 🏠 숨숨집과 아지트 안에서는 안 잡히고 경비는 못 들어와요.','경비: 도둑에게 닿으면 잡아서 아지트로 돌려보내요(인형은 제자리로). 멍!으로 도둑을 깜짝 놀래켜 멈추게 해요. 도둑일 때 더 많이 훔친 쪽이 승리!'],
-    init(o){const mz=gen(o.seed);s={o,mz,dl:dollsFor(o.seed,mz),first:(o.seed>>>6)&1,r:0,score:[0,0],me:{},op:{ok:o.bot?true:undefined},d:derive(o.myC),od:derive(o.oppC),ended:false,endAt:0,bot:o.bot?{}:null,fsT:0,del:new Set()};newRound(o.now);bigText('맵: '+MAPS[mz.kind].n,true,1500)},
+    rules:['한 명은 도둑, 한 명은 경비! 2판 하면서 역할을 바꿔요. 불 꺼진 방이라 내 주변만 보여요.','도둑: 인형 5개를 몰래 들고 아지트 1·2(위 양쪽) 중 아무 데나 가져가면 1개! 갈래길·샛길로 경비를 속여요. 🏠 숨숨집과 아지트 근처는 경비가 못 들어와요.','🎁 선물 상자를 밟으면 바로 써져요: 👟 신발(빨라짐) · 🔦 손전등(상대 위치 보임) · 🫥 이불 망토(안 보임, 못 잡힘) · 🍯 꿀단지(내 자리에 끈끈이, 상대가 밟으면 멈춤)','경비: 도둑에게 닿으면 잡아요(인형은 제자리로). 멍!으로 도둑을 멈추게 해요. 도둑일 때 더 많이 훔친 쪽이 승리!'],
+    init(o){const mz=gen(o.seed);s={o,mz,dl:dollsFor(o.seed,mz),it:[],got:new Set(),glue:[],first:(o.seed>>>6)&1,r:0,score:[0,0],me:{},op:{ok:o.bot?true:undefined},d:derive(o.myC),od:derive(o.oppC),ended:false,endAt:0,bot:o.bot?{}:null,fsT:0,del:new Set()};newRound(o.now);bigText('맵: '+MAPS[mz.kind].n,true,1500)},
     step(dt,now,inp){if(s.ended)return;const [P,pe]=ph(now),m=s.me,op=s.op,th=amThief();
       if(P!==s.lastP){s.lastP=P;if(P==='play'){bigText(th?'훔쳐라!':'지켜라!',true,900);beep(660,.2,'triangle',.06)}if(P==='end')bigText('시간 끝!',true,1200)}
       if(P==='end'){if(pe>END){if(s.r+1>=NR){s.ended=true;s.endAt=now;return}s.r++;newRound(now)}if(!s.o.bot)smooth(op,dt);return}
       if(P==='intro'){if(!s.o.bot)smooth(op,dt);return}
       s.cd=Math.max(0,s.cd-dt);s.ccd=Math.max(0,s.ccd-dt);m.st=Math.max(0,m.st-dt);m.dash=Math.max(0,m.dash-dt);
-      const sp=s.d.speed*(th?(m.c>=0?.85:1.02)*(m.dash>0?1.9:1):1)*(m.st>0?.25:1);walk(m,inp,sp,dt);gResolve(s.mz,m,T);
+      const sp=s.d.speed*(th?(m.c>=0?.85:1.02)*(m.dash>0?1.9:1):1)*(fxOn(m,'shoe',now)?1.5:1)*(m.st>0?.25:1);walk(m,inp,sp,dt);gResolve(s.mz,m,T);itemPick(m,'me',now);glueStep(m,'me',now);
       if(inp.pressed&&s.cd<=0){s.cd=4;if(th){m.dash=.5;bubble('me','휙!',.6);beep(700,.1,'triangle',.05);for(let i=0;i<4;i++)dust(m.x,m.y)}else{bubble('me','멍!',1);ring(m.x,m.y,'#7ec6ff',BR);beep(300,.15,'square',.05);if(s.o.bot)barkHit(op,m.x,m.y,'op');else sendEv({k:'bark',x:Math.round(m.x),y:Math.round(m.y),p:s.r})}}
       if(th)thiefLogic(m,'me');else{pushOut(m);gResolve(s.mz,m,T)}
-      if(!th&&s.ccd<=0&&op.ok!==false&&hyp(op.x-m.x,op.y-m.y)<CATCH&&!inSafe(op)&&!inB(op,B[0])){s.ccd=2;if(s.o.bot)caughtT(op,'op');else{sendEv({k:'cg',p:s.r});bubble('me','잡았다!',1);beep(880,.2,'triangle',.07);bigText('잡았다! 코츄!',true,1000)}}
+      if(!th&&s.ccd<=0&&op.ok!==false&&hyp(op.x-m.x,op.y-m.y)<CATCH&&!inSafe(op)&&!inHide(op)&&!fxOn(op,'cloak',now)){s.ccd=2;if(s.o.bot)caughtT(op,'op');else{sendEv({k:'cg',p:s.r});bubble('me','잡았다!',1);beep(880,.2,'triangle',.07);bigText('잡았다! 코츄!',true,1000)}}
       const dd=hyp(op.x-m.x,op.y-m.y),L=th?LT:LG;if(dd>L&&dd<300){s.fsT-=dt;if(s.fsT<=0){s.fsT=.6;P2step(op.x,op.y)}}
       if(s.bot)stepBot(dt,now);else smooth(op,dt)},
-    onRemote(g){if(num(g.r,-1)!==s.r)return;remoteTo(s.op,g,0,0,GW*T,GH*T);if(hyp(s.op.tx-s.op.x,s.op.ty-s.op.y)>3*T){s.op.x=s.op.tx;s.op.y=s.op.ty}
+    onRemote(g){if(num(g.r,-1)!==s.r)return;remoteTo(s.op,g,0,0,GW*T,GH*T);s.op.fx=s.op.fx||{};const nw=performance.now();s.op.fx.cloak=g.ck?nw+500:0;s.op.fx.shoe=g.sh?nw+500:0;if(hyp(s.op.tx-s.op.x,s.op.ty-s.op.y)>3*T){s.op.x=s.op.tx;s.op.y=s.op.ty}
       if(!amThief()){const c=Math.floor(num(g.c,-1));s.op.c=c>=0&&c<s.dl.length?c:-1;if(Array.isArray(g.dl)){let added=0;g.dl.forEach(i=>{if(Number.isInteger(i)&&i>=0&&i<s.dl.length&&!s.del.has(i)){s.del.add(i);added++}});if(added){s.score[thiefIdx(s.r)]=s.del.size;bigText(opName()+' 성공 · '+s.del.size+'개째',true,1000,true)}}}},
-    onEv(e){if(num(e.p,-1)!==s.r||s.ended)return;if(e.k==='cg'&&amThief()&&ph(performance.now())[0]==='play'&&!inSafe(s.me)&&!inB(s.me,B[0]))caughtT(s.me,'me');if(e.k==='bark'&&amThief()){bubble('op','멍!',1);ring(num(e.x),num(e.y),'#7ec6ff',BR);barkHit(s.me,num(e.x),num(e.y),'me')}},
+    onEv(e){if(num(e.p,-1)!==s.r||s.ended)return;if(e.k==='it'){const i=Math.floor(num(e.i,-1));if(i>=0&&i<s.it.length)s.got.add(i)}if(e.k==='gl')s.glue.push({x:num(e.x),y:num(e.y),by:s.op,t:performance.now()});if(e.k==='cg'&&amThief()&&ph(performance.now())[0]==='play'&&!inSafe(s.me)&&!inHide(s.me))caughtT(s.me,'me');if(e.k==='bark'&&amThief()){bubble('op','멍!',1);ring(num(e.x),num(e.y),'#7ec6ff',BR);barkHit(s.me,num(e.x),num(e.y),'me')}},
     botHear(e){},
-    state(){return{x:Math.round(s.me.x),y:Math.round(s.me.y),c:s.me.c,dl:amThief()?Array.from(s.del):[],r:s.r,sc:s.score[s.o.me]}},
+    state(){const nw=performance.now();return{x:Math.round(s.me.x),y:Math.round(s.me.y),ck:fxOn(s.me,'cloak',nw)?1:0,sh:fxOn(s.me,'shoe',nw)?1:0,c:s.me.c,dl:amThief()?Array.from(s.del):[],r:s.r,sc:s.score[s.o.me]}},
     result(now){if(!s.ended||now-s.endAt<500)return null;const a=s.score[s.o.me],b=s.score[1-s.o.me];return a===b?'draw':(a>b?'me':'opp')},
     summary(){return'훔친 인형 나 '+s.score[s.o.me]+'개 · '+opName()+' '+s.score[1-s.o.me]+'개'},
     hud(now){const [P,pe]=ph(now),th=amThief();const sec=P==='play'?Math.ceil(PLAY-pe):PLAY;return{t:(s.r+1)+'/'+NR+'판 0:'+String(sec).padStart(2,'0'),low:P==='play'&&sec<=8,c:(th?(s.me.c>=0?'인형 들고 아지트로!':'🦹 도둑'):'👮 경비')+' · '+s.score[s.o.me]+':'+s.score[1-s.o.me],cls:th?(s.me.c>=0?'it':'run'):'go'}},
@@ -825,23 +834,26 @@ const StealG=(()=>{
         if(f.ty==='shelf'){const cs=['#7ec6ff','#ffd59a','#ff8a68','#8fe08a'];for(let i=0;i<f.w*4;i++){ctx.fillStyle=cs[i%4];ctx.fillRect(f.x*T+6+i*9,f.y*T+8,6,14)}}
         if(f.ty==='box'){ctx.fillStyle='rgba(255,255,255,.3)';ctx.fillRect(f.x*T+6,f.y*T+10,f.w*T-12,4)}if(f.ty==='hedge'){ctx.fillStyle=pat(QUILT);ctx.fillRect(f.x*T+4,f.y*T+4,T-8,T-14)}if(f.ty==='plant'){ctx.font='26px sans-serif';ctx.textAlign='center';ctx.fillText('🪴',f.x*T+T/2,f.y*T+T*.75)}if(f.ty==='sofa'){ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(f.x*T+8,f.y*T+8,f.w*T-16,6)}}
       // 아지트·금고
-      const A0=B[0],A1=B[1];ctx.fillStyle='rgba(255,138,104,.18)';rr(A0.x0*T+4,A0.y0*T+4,(A0.x1-A0.x0+1)*T-8,(A0.y1-A0.y0+1)*T-8,14);ctx.fill();ctx.strokeStyle='rgba(255,138,104,.6)';ctx.lineWidth=3;ctx.setLineDash([8,6]);ctx.stroke();ctx.setLineDash([]);
+      const A0=B[0],A1=B[1],A2=B[2];[A0,A2].forEach(A=>{ctx.fillStyle='rgba(255,138,104,.18)';rr(A.x0*T+4,A.y0*T+4,(A.x1-A.x0+1)*T-8,(A.y1-A.y0+1)*T-8,14);ctx.fill();ctx.strokeStyle='rgba(255,138,104,.6)';ctx.lineWidth=3;ctx.setLineDash([8,6]);ctx.stroke();ctx.setLineDash([]);if(!th){ctx.strokeStyle='rgba(255,138,104,.25)';ctx.lineWidth=2;rr((A.x0-1)*T,(A.y0-1)*T,(A.x1-A.x0+3)*T,(A.y1-A.y0+3)*T,18);ctx.stroke()}});
       ctx.fillStyle='#e8b4a0';rr(A1.x0*T+6,A1.y0*T+14,(A1.x1-A1.x0+1)*T-12,(A1.y1-A1.y0+1)*T-20,18);ctx.fill();ctx.strokeStyle='#b77d68';ctx.lineWidth=5;ctx.beginPath();ctx.arc((A1.x0+A1.x1+1)/2*T,A1.y0*T+18,34,Math.PI,0);ctx.stroke();
-      ctx.font='14px Jua, sans-serif';ctx.textAlign='center';ctx.fillStyle='#ffb39c';ctx.fillText('🦹 도둑 아지트',bc(A0)[0],A0.y0*T-4+T*.2);ctx.fillStyle='#ffd59a';ctx.fillText('🔒 인형 금고',bc(A1)[0],A1.y0*T+10);
+      ctx.font='14px Jua, sans-serif';ctx.textAlign='center';ctx.fillStyle='#ffb39c';ctx.fillText('🦹 아지트 1',bc(A0)[0],A0.y0*T-4+T*.2);ctx.fillText('🦹 아지트 2',bc(A2)[0],A2.y0*T-4+T*.2);ctx.fillStyle='#ffd59a';ctx.fillText('🔒 인형 금고',bc(A1)[0],A1.y0*T+10);
       // 아지트에 쌓인 인형
       Array.from(s.del).forEach((i,k)=>drawToken(bc(A0)[0]-30+k*20,bc(A0)[1]+18,DOLLS[i],{scale:.55}));
       s.mz.safe.forEach(q=>{ctx.fillStyle='rgba(143,224,138,.22)';ctx.beginPath();ctx.arc(q.x,q.y,T*.62,0,7);ctx.fill();ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(143,224,138,.8)';ctx.lineWidth=2.5;ctx.stroke();ctx.setLineDash([]);ctx.font='18px sans-serif';ctx.textAlign='center';ctx.fillText('🏠',q.x,q.y+7)});
       ctx.font='13px Jua, sans-serif';ctx.textAlign='center';s.mz.lanes.forEach((L,i)=>{[L.top,L.bot].forEach(([x,y])=>{ctx.fillStyle='rgba(29,26,58,.8)';ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.fill();ctx.fillStyle='#ffd47a';ctx.fillText(String(i+1),x,y+5)})});
+      {const el=(now-s.rs)/1000-INTRO;s.it.forEach((q,i)=>{if(s.got.has(i)||el<q.t||el>q.t+14)return;const b=Math.sin(t*4+i)*3,fade=el>q.t+11?.4+.4*Math.sin(t*14):1;ctx.save();ctx.globalAlpha=fade;ctx.fillStyle='rgba(255,212,122,.3)';ctx.beginPath();ctx.arc(q.x,q.y,18,0,7);ctx.fill();ctx.fillStyle='#c99a5c';rr(q.x-12,q.y-8+b,24,18,4);ctx.fill();ctx.fillStyle='#ffd47a';ctx.fillRect(q.x-2,q.y-8+b,4,18);ctx.fillRect(q.x-12,q.y-1+b,24,4);ctx.restore()});
+        s.glue.forEach(g=>{if(g.by!==m&&!fxOn(m,'torch',now)&&hyp(g.x-m.x,g.y-m.y)>(th?LT:LG)*.7)return;ctx.fillStyle='rgba(255,190,60,.75)';ctx.beginPath();ctx.ellipse(g.x,g.y+4,16,9,0,0,7);ctx.fill();ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('🍯',g.x,g.y+2)})}
       const drawDolls=()=>s.dl.forEach((q,i)=>{if(!avail(i))return;ctx.fillStyle='rgba(255,213,154,'+(.2+.12*Math.sin(t*4+i)).toFixed(2)+')';ctx.beginPath();ctx.arc(q.x,q.y,20,0,7);ctx.fill();drawToken(q.x,q.y,DOLLS[i],{scale:.72,bob:t*3+i})});drawDolls();
       const carry=(p)=>{if(p.c>=0)drawToken(p.x,p.y-PR-16,DOLLS[p.c],{scale:.55})};
-      const vis=op.ok!==false&&hyp(op.x-m.x,op.y-m.y)<(th?LT:LG);
+      const vis=op.ok!==false&&!fxOn(op,'cloak',now)&&(fxOn(m,'torch',now)||hyp(op.x-m.x,op.y-m.y)<(th?LT:LG));
       if(vis&&P!=='intro'){drawToken(op.x,op.y,s.o.oppC,{label:opName()+(th?' 👮':' 🦹'),col:opCol(),bob:op.bob,tilt:op.tilt,t,alpha:op.st>0?.6:1});carry(op);drawBubble(op.x,op.y,C.bub.op,now)}
-      drawToken(m.x,m.y,s.o.myC,{label:'나'+(th?' 🦹':' 👮'),bob:m.bob,tilt:m.tilt,t,alpha:m.st>0?.6:1});carry(m);drawParts();
+      drawToken(m.x,m.y,s.o.myC,{label:'나'+(th?' 🦹':' 👮'),bob:m.bob,tilt:m.tilt,t,alpha:fxOn(m,'cloak',now)?.4:m.st>0?.6:1});if(fxOn(m,'cloak',now)){ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('🫥',m.x+PR,m.y-PR-4)}carry(m);drawParts();
       screen();if(!dark||dark.width!==cv.width||dark.height!==cv.height){dark=document.createElement('canvas');dark.width=cv.width;dark.height=cv.height}
       const dg=dark.getContext('2d');dg.globalCompositeOperation='source-over';dg.clearRect(0,0,dark.width,dark.height);dg.fillStyle=P==='intro'?'rgba(6,5,16,.35)':'rgba(6,5,16,.93)';dg.fillRect(0,0,dark.width,dark.height);dg.globalCompositeOperation='destination-out';
       const hole=(wx,wy,r)=>{const [x,y]=toS(wx,wy);const g=dg.createRadialGradient(x*dpr,y*dpr,r*z*dpr*.35,x*dpr,y*dpr,r*z*dpr);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');dg.fillStyle=g;dg.beginPath();dg.arc(x*dpr,y*dpr,r*z*dpr,0,7);dg.fill()};
-      hole(m.x,m.y,th?LT:LG);s.mz.safe.forEach(q=>hole(q.x,q.y,34));hole(bc(A0)[0],bc(A0)[1],70);hole(bc(A1)[0],bc(A1)[1],th?40:80);ctx.drawImage(dark,0,0,W,H);
+      hole(m.x,m.y,th?LT:LG);s.mz.safe.forEach(q=>hole(q.x,q.y,34));hole(bc(A0)[0],bc(A0)[1],70);hole(bc(A2)[0],bc(A2)[1],70);hole(bc(A1)[0],bc(A1)[1],th?40:80);{const el=(now-s.rs)/1000-INTRO;s.it.forEach((q,i)=>{if(!s.got.has(i)&&el>=q.t&&el<=q.t+14)hole(q.x,q.y,26)})}if(fxOn(m,'torch',now)&&op.ok!==false)hole(op.x,op.y,60);ctx.drawImage(dark,0,0,W,H);
       cam(cx,cy,z);if(P!=='intro'){ctx.globalAlpha=.85;drawDolls();ctx.globalAlpha=1}
+      screen();{const fx=['shoe','torch','cloak'].filter(k=>fxOn(m,k,now));if(fx.length){ctx.font='15px Jua, sans-serif';ctx.textAlign='center';ctx.fillStyle='#ffd47a';ctx.fillText(fx.map(k=>ITEMS[k].e+' '+ITEMS[k].n+' '+Math.ceil((m.fx[k]-now)/1000)+'초').join('  '),W/2,H-130)}}cam(cx,cy,z);
       for(const p of C.parts)if(p.t==='step'){const a=p.life/p.max;ctx.strokeStyle='rgba(255,255,255,'+(a*.6).toFixed(2)+')';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,(1-a)*26+4,0,7);ctx.stroke()}
       drawBubble(m.x,m.y,C.bub.me,now);
       screen();ctx.font='13px Jua, sans-serif';ctx.textAlign='left';ctx.fillStyle='rgba(246,236,220,.7)';ctx.fillText('맵 · '+MAPS[s.mz.kind].n,16,H-26);ctx.textAlign='center';
