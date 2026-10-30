@@ -3035,7 +3035,69 @@ const WordG=(()=>{
       drawBubble(W*.3,H*.72,C.bub.me,now);drawBubble(W*.7,H*.72,C.bub.op,now);drawParts()}
   }})();
 
-const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG,MemoryG,DanceG,BluffG,HideG,SashimiG,WordG];
+/* ================= 게임 24: 진짜를 찾아라 ================= */
+const HumanG=(()=>{
+  const N=12,AW=520,AH=680,NR=2,INTRO=2.6,PLAY=40,END=2.4,GUESS=2,SP=112;let s=null;
+  const hiderIdx=r=>(r+s.first)%2,amHider=()=>hiderIdx(s.r)===s.o.me;
+  const ph=now=>{const e=(now-s.rs)/1000;if(e<INTRO)return['intro',e];if(!s.fin&&e<INTRO+PLAY)return['play',e-INTRO];return['end',e]};
+  function mkAI(r,i){return{x:(r()-.5)*AW*.9,y:(r()-.5)*AH*.9,tx:0,ty:0,wait:r()*2,sp:SP*(.85+r()*.3),bob:0,tilt:0,kx:0,ky:0,like:r()*.5+.1,mark:false}};
+  function newRound(now){const r=mulberry32((s.o.seed^0x11a5)+s.r*77);s.rs=now;s.ai=[];for(let i=0;i<N;i++)s.ai.push(mkAI(r,i));s.my=Math.floor(r()*N);s.ac={x:(r()-.5)*AW*.7,y:(r()-.5)*AH*.7,n:0};s.acr=r;s.acn=0;s.oacn=0;s.fin=false;s.found=false;s.ft=0;s.guess=0;s.marks=[];s.gq=0;s.og={};s.bot&&Object.assign(s.bot,{at:now+(8+Math.random()*6)*1000,n:0});
+    G.tapPos=!amHider();G.stick=amHider();bigText((s.r+1)+'판 · '+(amHider()?'나는 숨는 사람! 사랑이 틈에 섞여요':'나는 술래! 진짜 사람을 찾아요'),true,2300,!amHider())}
+  function aiStep(a,i,dt,now,human){a.wait-=dt;const toAc=a.like>.42||human;
+    if(a.wait<=0){const r=Math.random;if(toAc&&r()<(human?.8:.35)){a.tx=s.ac.x+(r()-.5)*(human?20:120);a.ty=s.ac.y+(r()-.5)*(human?20:120)}else{a.tx=(r()-.5)*AW*.9;a.ty=(r()-.5)*AH*.9}a.wait=(human?1:1.5)+r()*(human?2:3.5);a.pause=human?r()*.4:r()*1.6}
+    if(a.pause>0){a.pause-=dt;walk(a,{mx:0,my:0,mag:0},0,dt);return}
+    const dx=a.tx-a.x,dy=a.ty-a.y,l=hyp(dx,dy);if(l<6){walk(a,{mx:0,my:0,mag:0},0,dt);return}
+    walk(a,{mx:dx/l,my:dy/l,mag:Math.min(1,l/40)},a.sp*(human?1.12:1),dt);a.x=clamp(a.x,-AW/2+PR,AW/2-PR);a.y=clamp(a.y,-AH/2+PR,AH/2-PR)}
+  function eatCheck(){const ac=s.ac;for(let i=0;i<N;i++){const a=s.ai[i];if(hyp(a.x-ac.x,a.y-ac.y)<PR+12){if(i===s.my){s.acn++;if(amHider()){bubble('me','도토리 냠!',.8);beep(660,.08,'triangle',.05)}else if(s.o.bot)s.oacn++}
+      const r=s.acr;ac.x=(r()-.5)*AW*.75;ac.y=(r()-.5)*AH*.75;ac.n++;return}}}
+  function judge(i,now){const ok=i===s.my;s.marks.push(i);if(ok){s.fin=true;s.found=true;s.ft=Math.round(((now-s.rs)/1000-INTRO)*10)/10}return ok}
+  const zoom=()=>Math.min(W/(AW+40),(H-170)/(AH+40));
+  function hitAI(tap){const z=zoom(),wx=(tap[0]-W/2)/z,wy=(tap[1]-H/2-10)/z;let best=-1,bd=38;s.ai.forEach((a,i)=>{const d=hyp(a.x-wx,a.y-wy);if(d<bd){bd=d;best=i}});return best}
+  function endRound(now){s.endAt=now;s.res[s.r]={hider:hiderIdx(s.r),acn:amHider()?s.acn:s.oacn,found:s.found,ft:s.ft}}
+  const G={
+    id:'human',name:'진짜를 찾아라',btn:'찍기',stat:null,stick:true,tapPos:true,
+    rules:['사랑이 12마리가 돌아다니는데, 그중 딱 한 마리만 진짜 사람이 움직여요! 2판 하면서 역할을 바꿔요.','숨는 사람: 티 안 나게 섞여서 40초 동안 🌰 도토리를 최대한 먹어요. 들키면 그 순간 끝!','술래: 움직임을 보고 사람 같은 사랑이를 눌러요. 2번까지 찍을 수 있어요. 숨는 사람일 때 도토리를 더 많이 먹은 쪽이 승리! 같으면 더 빨리 찾은 쪽이 승리.'],
+    init(o){s={o,first:(o.seed>>>4)&1,r:0,res:[],bot:o.bot?{}:null,endAt:0,ended:false,rem:null};newRound(o.now)},
+    step(dt,now,inp){if(s.ended)return;const [P,pe]=ph(now),H=amHider();
+      if(P!==s.lastP){s.lastP=P;if(P==='play'){bigText(H?'섞여라!':'찾아라!',true,900);beep(660,.2,'triangle',.06)}if(P==='end'){if(!s.endAt)endRound(now);if(!s.found)bigText(H?'끝까지 안 들켰다!':'못 찾았다…',true,1500,!H)}}
+      if(P==='end'){if(now-s.endAt>END*1000){if(s.r+1>=NR){s.ended=true;return}s.r++;s.lastP='';s.endAt=0;newRound(now)}return}
+      if(P==='intro')return;
+      if(H||s.o.bot){// 숨는 사람(또는 봇 모드)의 클라이언트가 AI를 굴린다
+        for(let i=0;i<N;i++){if(i===s.my&&H){const a=s.ai[i];walk(a,inp,SP*1.05,dt);a.x=clamp(a.x,-AW/2+PR,AW/2-PR);a.y=clamp(a.y,-AH/2+PR,AH/2-PR)}else aiStep(s.ai[i],i,dt,now,i===s.my&&!H)}
+        eatCheck();
+        if(H){if(!s.o.bot){for(const q in s.og){const g=s.og[q];delete s.og[q];if(s.marks.length<GUESS&&!s.fin){const ok=judge(g.i,now);sendEv({k:'gr',p:s.r,i:g.i,ok:ok?1:0,q:+q});bigText(ok?'들켰다!!':'상대가 틀렸다! ('+(GUESS-s.marks.length)+'번 남음)',true,1300,ok);beep(ok?200:880,.2,ok?'sawtooth':'triangle',.06)}}}
+          else{const bt=s.bot;if(now>=bt.at&&s.marks.length<GUESS&&!s.fin){bt.at=now+(6+Math.random()*5)*1000;const near=s.ai.map((a,i)=>i).filter(i=>!s.marks.includes(i));const pick=Math.random()<.38?s.my:near[Math.floor(Math.random()*near.length)];const ok=judge(pick,now);bubble('op',ok?'너다!':'음… 너?',1);bigText(ok?'들켰다!!':'컴퓨터가 틀렸다! ('+(GUESS-s.marks.length)+'번 남음)',true,1300,ok);beep(ok?200:880,.2,ok?'sawtooth':'triangle',.06)}}}
+        else{// 봇이 숨는 사람: 내 찍기
+          if(inp.tap&&s.marks.length<GUESS&&!s.fin){const i=hitAI(inp.tap);if(i>=0&&!s.marks.includes(i)){const ok=judge(i,now);bigText(ok?'찾았다! 진짜 사람!':'아니야… ('+(GUESS-s.marks.length)+'번 남음)',true,1300,!ok);beep(ok?990:220,.2,ok?'triangle':'sawtooth',.06);if(ok)confetti(W/2,H*.4,30)}}}
+        }
+      else{// 술래 (온라인): 원격 상태 반영, 찍기 전송
+        const g=s.rem;if(g&&Array.isArray(g.ai)){for(let i=0;i<N;i++){const a=s.ai[i],q=g.ai[i];if(!q)continue;const tx=num(q[0]),ty=num(q[1]);const ox=a.x;a.x+=(tx-a.x)*Math.min(1,dt*14);a.y+=(ty-a.y)*Math.min(1,dt*14);a.bob=(a.bob||0)+(hyp(tx-a.x,ty-a.y)>.5?dt*10:0)}
+          if(g.ac){s.ac.x=num(g.ac[0]);s.ac.y=num(g.ac[1])}s.oacn=num(g.acn);if(Array.isArray(g.mk))s.marks=g.mk.filter(Number.isInteger);if(g.fin&&!s.fin){s.fin=true;s.found=!!g.fd;s.ft=num(g.ft)}}
+        if(inp.tap&&s.marks.length+Object.keys(s.pendG||{}).length<GUESS&&!s.fin){const i=hitAI(inp.tap);if(i>=0&&!s.marks.includes(i)){s.gq++;s.pendG=s.pendG||{};s.pendG[s.gq]=i;sendEv({k:'gs',p:s.r,i,q:s.gq});bubble('me','너다!',.9);beep(520,.1,'triangle',.05)}}}
+      if(s.fin&&!s.endAt){endRound(now)}},
+    onRemote(g){if(num(g.r,-1)!==s.r)return;if(!amHider())s.rem=g},
+    onEv(e){if(num(e.p,-1)!==s.r)return;if(e.k==='gs'&&amHider()){const q=Math.floor(num(e.q,-1));s.ogDone=s.ogDone||{};if(q>0&&!s.ogDone[q]){s.ogDone[q]=1;s.og[q]={i:clamp(Math.floor(num(e.i)),0,N-1)}}}
+      if(e.k==='gr'&&!amHider()){const q=Math.floor(num(e.q,-1));if(s.pendG)delete s.pendG[q];const i=clamp(Math.floor(num(e.i)),0,N-1);if(!s.marks.includes(i))s.marks.push(i);const now=performance.now();if(e.ok){if(!s.fin){s.fin=true;s.found=true;s.ft=Math.round(((now-s.rs)/1000-INTRO)*10)/10;bigText('찾았다! 진짜 사람!',true,1300);beep(990,.2,'triangle',.06);confetti(W/2,H*.4,30)}}else{bigText('아니야… ('+(GUESS-s.marks.length)+'번 남음)',true,1300,true);beep(220,.2,'sawtooth',.06)}}},
+    botHear(e){},
+    state(){const H=amHider();if(!H)return{r:s.r};return{r:s.r,ai:s.ai.map(a=>[Math.round(a.x),Math.round(a.y)]),ac:[Math.round(s.ac.x),Math.round(s.ac.y)],acn:s.acn,mk:s.marks,fin:s.fin?1:0,fd:s.found?1:0,ft:s.ft}},
+    result(now){if(!s.ended)return null;const mine=s.res.find(q=>q&&q.hider===s.o.me),theirs=s.res.find(q=>q&&q.hider!==s.o.me);if(!mine||!theirs)return'draw';
+      if(mine.acn!==theirs.acn)return mine.acn>theirs.acn?'me':'opp';const mf=theirs.found?theirs.ft:999,of=mine.found?mine.ft:999;if(mf!==of)return mf<of?'me':'opp';return'draw'},
+    summary(){const mine=s.res.find(q=>q&&q.hider===s.o.me)||{acn:0},theirs=s.res.find(q=>q&&q.hider!==s.o.me)||{acn:0};return'숨었을 때 먹은 도토리 나 '+mine.acn+'개 · '+opName()+' '+theirs.acn+'개'},
+    hud(now){const [P,pe]=ph(now),H=amHider();const sec=P==='play'?Math.ceil(PLAY-pe):PLAY;return{t:(s.r+1)+'/'+NR+'판 0:'+String(sec).padStart(2,'0'),low:P==='play'&&sec<=8,c:H?'🌰 '+s.acn+'개 · 섞여라':'찍기 '+(GUESS-s.marks.length)+'번 남음',cls:H?'go':'it'}},
+    button(){return{label:amHider()?'섞이기':'찍기',off:true}},
+    draw(now){const t=now/1000,[P]=ph(now),hd=amHider(),z=zoom();
+      screen();ctx.fillStyle=SCN.field.sky;ctx.fillRect(0,0,W,H);cam(0,0,z,0,10);SCN.field.floor(-W/z,-H/z,W*2/z,H*2/z,t);
+      ctx.fillStyle='rgba(0,0,0,.25)';rr(-AW/2-8,-AH/2-4,AW+16,AH+16,24);ctx.fill();ctx.fillStyle='#b8894f';rr(-AW/2,-AH/2,AW,AH,20);ctx.fill();ctx.strokeStyle='rgba(90,55,25,.3)';ctx.lineWidth=3;for(let y=-AH/2+24;y<AH/2;y+=40){ctx.beginPath();ctx.moveTo(-AW/2,y);ctx.quadraticCurveTo(0,y+5,AW/2,y);ctx.stroke()}
+      drawAcorn(s.ac.x,s.ac.y,t,1.5);
+      const order=s.ai.map((a,i)=>i).sort((a,b)=>s.ai[a].y-s.ai[b].y);
+      order.forEach(i=>{const a=s.ai[i],mk=s.marks.includes(i);drawToken(a.x,a.y,0,{bob:a.bob,tilt:a.tilt,alpha:mk?.35:1});if(mk){ctx.strokeStyle='#ff5a5f';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(a.x-12,a.y-12);ctx.lineTo(a.x+12,a.y+12);ctx.moveTo(a.x+12,a.y-12);ctx.lineTo(a.x-12,a.y+12);ctx.stroke()}
+        if(hd&&i===s.my&&P==='play'){ctx.strokeStyle='rgba(255,138,104,'+(.35+.25*Math.sin(t*5)).toFixed(2)+')';ctx.lineWidth=2;ctx.setLineDash([3,4]);ctx.beginPath();ctx.arc(a.x,a.y,PR+8,0,7);ctx.stroke();ctx.setLineDash([])}
+        if(s.fin&&s.found&&i===s.my){ctx.fillStyle='#ffd47a';ctx.font='14px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('진짜!',a.x,a.y-PR-10)}});
+      if(hd)drawBubble(s.ai[s.my].x,s.ai[s.my].y,C.bub.me,now);drawBubble(0,-AH/2+40,C.bub.op,now);drawParts();screen();
+      ctx.font='13px Jua, sans-serif';ctx.textAlign='left';ctx.fillStyle='rgba(246,236,220,.8)';ctx.fillText(hd?'내 사랑이에만 점선이 보여요 (상대는 못 봐요)':'사람처럼 움직이는 사랑이를 눌러요',16,H-26)}
+  };return G})();
+
+const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG,MemoryG,DanceG,BluffG,HideG,SashimiG,WordG,HumanG];
 
 /* ================= 입력 ================= */
 const In={mx:0,my:0,mag:0,pressed:false,held:false};const J={active:false,id:-1,ox:0,oy:0,sx:0,sy:0,dx:0,dy:0,mag:0};const K={};
