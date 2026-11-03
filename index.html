@@ -3136,72 +3136,94 @@ const ClueG=(()=>{
   const isRoom=n=>n>=1000,RN=r=>1000+r;
   function nbrs(n){if(isRoom(n))return ROOMS[n-1000].d.map(([x,y])=>y*GX+x);const x=n%GX,y=(n/GX)|0,out=[];
     for(const [dx,dy] of DIRS){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=GX||ny>=GY)continue;const k=ny*GX+nx;if(walk[k])out.push(k)}(doorOf[n]||[]).forEach(r=>out.push(RN(r)));return out}
-  function bfs(from,block){const dist=new Map([[from,0]]),par=new Map(),q=[from];
-    for(let h=0;h<q.length;h++){const n=q[h];if(n!==from&&isRoom(n))continue;for(const m of nbrs(n)){if(dist.has(m)||m===block)continue;dist.set(m,dist.get(n)+1);par.set(m,n);q.push(m)}}return{dist,par}}
-  function pathTo(from,to,block){const {par}=bfs(from,block);const p=[to];let c=to;while(par.has(c)){c=par.get(c);p.push(c)}return p.reverse()}
   let s=null,ui=null,cssDone=false;window.__clue={s:()=>s,reach:()=>reach(me()),xy:n=>nodeXY(n,me())};
-  const me=()=>s.o.me,opp=()=>1-s.o.me,mine=()=>s.turn===s.o.me;
-  const blockFor=w=>isRoom(s.pos[1-w])?-1:s.pos[1-w];
+  const NPL=4,ORDER=[0,2,1,3];
+  const me=()=>s.o.me,mine=()=>s.turn===s.o.me;
+  const isBot=i=>i>=2||(s.o.bot&&i===1-s.o.me);
+  const runsBot=i=>isBot(i)&&(s.o.bot||s.o.me===0);
+  const nm=i=>i===me()?'나':i<2?opName():CHARS[s.chr[i]].name+' 탐정';
+  const nmS=i=>i===me()?'내가':nm(i)+(i<2?'가':'이');const nmP=i=>i===me()?'내':nm(i);const nmT=i=>i===me()?'나는':nm(i)+(i<2?'는':'은');
+  const PCOL=['#ff8a68','#7ec6ff','#ffd47a','#8fe08a'];
+  const pcol=i=>i===me()?PCOL[0]:i<2?PCOL[1]:PCOL[i];
+  const nextP=t=>{let k=ORDER.indexOf(t);for(let j=0;j<NPL;j++){k=(k+1)%NPL;if(!s.out[ORDER[k]])return ORDER[k]}return t};
+  const blockFor=w=>{const b=new Set();for(let i=0;i<NPL;i++)if(i!==w&&!isRoom(s.pos[i]))b.add(s.pos[i]);return b};
+  function bfs(from,block){const dist=new Map([[from,0]]),par=new Map(),q=[from];
+    for(let h=0;h<q.length;h++){const n=q[h];if(n!==from&&isRoom(n))continue;for(const m of nbrs(n)){if(dist.has(m)||(block&&block.has&&block.has(m)))continue;dist.set(m,dist.get(n)+1);par.set(m,n);q.push(m)}}return{dist,par}}
+  function pathTo(from,to,block){const {par}=bfs(from,block);const p=[to];let c=to;while(par.has(c)){c=par.get(c);p.push(c)}return p.reverse()}
   function reach(w){if(!s.dice)return[];const {dist}=bfs(s.pos[w],blockFor(w));const out=[];dist.forEach((v,k)=>{if(k!==s.pos[w]&&v<=s.dice)out.push(k)});return out}
-  function L(){const top=100,bot=H-142,cs=Math.min((W-16)/GX,(bot-top)/GY),ox=(W-cs*GX)/2,oy=top+((bot-top)-cs*GY)/2;return{cs,ox,oy}}
-  function nodeXY(n,w){const {cs,ox,oy}=L();if(isRoom(n)){const R=ROOMS[n-1000];return[ox+(R.x+R.w/2+(w?.75:-.75))*cs,oy+(R.y+R.h-.75)*cs]}return[ox+(n%GX+.5)*cs,oy+(((n/GX)|0)+.5)*cs]}
+  function L(){const top=104,bot=H-142,cs=Math.min((W-16)/GX,(bot-top)/GY),ox=(W-cs*GX)/2,oy=top+((bot-top)-cs*GY)/2;return{cs,ox,oy}}
+  function nodeXY(n,w){const {cs,ox,oy}=L();if(isRoom(n)){const R=ROOMS[n-1000];return[ox+(R.x+R.w/2+(w-1.5)*.6)*cs,oy+(R.y+R.h-.72)*cs]}return[ox+(n%GX+.5)*cs,oy+(((n/GX)|0)+.5)*cs]}
   function log(t){s.log.unshift({tn:s.tn,t})}
-  function setPh(p,now){s.ph=p;s.phAt=now||performance.now();s.uiDirty=true}
-  /* ---------- 이벤트 적용 (양쪽 동일) ---------- */
-  function ap(e,now){now=now||performance.now();s.q++;const w=e.w,who=w===me()?'나':opName(),you=w===me();
+  const needMe=()=>(s.ph==='reply'&&s.sug&&s.sug.chain[s.sug.ci]===me())||(s.ph==='chal'&&s.sug&&s.sug.by===me());
+  function setPh(p,now){s.ph=p;s.phAt=now||performance.now();s.uiDirty=true;if((s.view==='hand'||s.view==='story')&&needMe()){s.view=null;s.first=false}}
+  const TALK=[['도토리? 나 아니야… 아마도 😇','탐정님 간식 있어요?','나 여기서 꼬리만 흔들었어!'],['쿨쿨… 어? 나 자고 있었어!','나 무거워서 못 훔쳐…','망덩이는 결백하다!'],['꼬리에 도토리 냄새? 기분 탓이야!','탐정님 왔다~ 반가워!','나 하루종일 거울 봤어'],
+    ['히히 나 알리바이 있어','미소는 웃기만 했어요 😊','수상한 건 시오야!'],['증거부터 가져와','나 여기서 책 읽었어','미소가 수상하던데?'],['멍! 왈! (수상한 냄새가 나…)','으르릉… 내 영역이야!','왈왈! 간식 주면 말해줄게'],['나 방금 3바퀴 뛰고 왔어. 바빴어!','세렝게티에선 이런 일 없었는데…','너무 빨라서 아무도 못 봤지 히히']];
+  function talkFor(r,w,now){const here=[];CHARS.forEach((c,k)=>{if(s.sus[k]===r&&k<TALK.length)here.push(k)});let txt,ch=-1,wi=s.wit.indexOf(r);
+    if(here.length){ch=here[Math.floor(Math.random()*here.length)];const L2=TALK[ch];txt=L2[Math.floor(Math.random()*L2.length)]}
+    else if(wi>=0){txt=WIT[wi].n+': 어서 와! 나한테 물어볼래?'}else txt=['…조용하다. 수상할 만큼.','바닥에 도토리 껍질이 하나 떨어져 있다…','누가 급하게 나간 흔적이 있다!'][Math.floor(Math.random()*3)];
+    s.talk={r,ch,wi:here.length?-1:wi,txt,at:now}}
+  /* ---------- 이벤트 적용 (모두 동일) ---------- */
+  function ap(e,now){now=now||performance.now();s.q++;const w=e.w,you=w===me();
     if(e.k==='roll'){s.dice=e.d;s.rollAt=now;setPh('move',now);beep(500,.08,'square',.04)}
     else if(e.k==='mv'){const p=pathTo(s.pos[w],e.to,blockFor(w));s.anim={w,p,t0:now};s.pos[w]=e.to;s.dice=0;setPh('act',now);s.inRoom=isRoom(e.to)?e.to-1000:-1;
-      if(isRoom(e.to))log(who+' → '+ROOMS[e.to-1000].n)}
-    else if(e.k==='sg'){const r=isRoom(s.pos[w])?s.pos[w]-1000:0;s.sus[e.s]=r;s.tool[e.t-NS]=r;s.sug={by:w,s:e.s,t:e.t,r,rep:null};s.sugDone=true;setPh('reply',now);
-      bigText((you?'내':opName())+' 추리: '+CHARS[e.s].name+' · '+TOOLS[e.t-NS].n+' · '+ROOMS[r].n,true,1800);beep(660,.15,'triangle',.06)}
-    else if(e.k==='rp'){const g=s.sug;g.rep=e.c;const held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[1-g.by].includes(c));g.lie=e.c<0&&held.length>0;if(g.lie){s.lieLeft[1-g.by]--;s.lies.push({tn:s.tn,by:1-g.by,held})}
-      const tri=CHARS[g.s].name+'·'+TOOLS[g.t-NS].n+'·'+ROOMS[g.r].n;
-      if(g.by===me()){if(e.c>=0){s.auto[e.c]=s.auto[e.c]||'받은 카드';log('내 추리 '+tri+' → '+opName()+'가 「'+cName(e.c)+'」 보여줌');s.reveal={c:e.c,at:now}}else log('내 추리 '+tri+' → '+opName()+': 없어!')}
-      else{log(opName()+' 추리 '+tri+' → 내가 '+(e.c>=0?'「'+cName(e.c)+'」 보여줌':(g.lie?'시치미 뗌 🤫':'없어')))}
-      setPh(e.c>=0?'act':'chal',now);beep(e.c>=0?880:300,.15,'triangle',.06)}
-    else if(e.k==='ch'){const g=s.sug;if(e.v){s.chalLeft[w]--;if(g.lie){s.skip[1-w]=1;const held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[1-w].includes(c));if(w===me())held.forEach(c=>s.auto[c]='들킨 카드');
-          bigText(you?'거짓말 잡았다! 상대 한 턴 쉬기':'시치미 들킴… 한 턴 쉬기',true,2200,!you);log((you?'내가':opName()+'가')+' 거짓말을 잡음! '+(you?'숨긴 카드: '+held.map(cName).join(', '):''));if(you)confetti(W/2,H/2,30)}
-        else{s.skip[w]=1;bigText(you?'진짜 없었어… 내가 한 턴 쉬기':'의심 실패! 상대 한 턴 쉬기',true,2200,you);log((you?'내':opName())+' 의심 실패')}}setPh('act',now)}
-    else if(e.k==='wt'){s.witAsk[w][e.i]=1;const from=s.wit[e.i];s.wit[e.i]=e.to;if(you){const cl=e.cl;if(cl){if(cl.length===1){s.auto[cl[0]]=s.auto[cl[0]]||'목격자'}}log(WIT[e.i].n+': '+(cl?(cl.length===1?'「'+cName(cl[0])+'」는 확실히 아니야':'「'+cName(cl[0])+'」랑 「'+cName(cl[1])+'」 중 적어도 하나는 아니야'):'아무것도 못 봤어…'));s.witMsg={i:e.i,cl,at:now}}
-      else log(opName()+'가 '+WIT[e.i].n+'에게 물어봄 ('+ROOMS[from].n+')');s.uiDirty=true}
-    else if(e.k==='ac'){const ok=e.s===s.env[0]&&e.t===s.env[1]&&e.r===s.env[2];s.acc={w,s:e.s,t:e.t,r:e.r,ok};s.ended=true;s.endAt=now;s.winner=ok?w:1-w;setPh('over',now);
-      if(s.winner===me())confetti(W/2,H/2,60);beep(ok?990:200,.4,ok?'triangle':'sawtooth',.07)}
-    else if(e.k==='end'){let t=1-w;s.tn++;if(s.skip[t]){s.skip[t]=0;log((t===me()?'내':opName())+' 차례 건너뜀');t=1-t;s.tn++}
-      s.turn=t;s.sugDone=false;s.sug=null;s.dice=0;s.reveal=null;s.witMsg=null;s.startNode=s.pos[t];setPh('start',now);if(t===me()){bigText('내 차례!',true,900);beep(880,.12,'triangle',.06)}}
+      if(isRoom(e.to)){log(nm(w)+' → '+ROOMS[e.to-1000].n);talkFor(e.to-1000,w,now+p.length*140)}}
+    else if(e.k==='sg'){const r=e.rm!=null&&e.rm>=0&&e.rm<NR?e.rm:(isRoom(s.pos[w])?s.pos[w]-1000:0);if(!you)[e.s,e.t,RC(r)].forEach(c=>{s.oppAsk[c]=(s.oppAsk[c]||0)+1});
+      s.sus[e.s]=r;s.tool[e.t-NS]=r;const chain=[];let x=w;for(let j=0;j<NPL-1;j++){x=ORDER[(ORDER.indexOf(x)+1)%NPL];chain.push(x)}
+      s.sug={by:w,s:e.s,t:e.t,r,chain,ci:0,nones:[],liars:[],rep:null,shownBy:-1};s.sugDone=true;s.reveal=null;setPh('reply',now);
+      bigText(nmP(w)+' 추리: '+CHARS[e.s].name+' · '+TOOLS[e.t-NS].n+' · '+ROOMS[r].n,true,1800);beep(660,.15,'triangle',.06)}
+    else if(e.k==='rp'){const g=s.sug;if(!g)return;const tri=CHARS[g.s].name+'·'+TOOLS[g.t-NS].n+'·'+ROOMS[g.r].n;const held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[w].includes(c));
+      if(e.c>=0){g.rep=e.c;g.shownBy=w;if(isBot(g.by))s.bk[g.by].known.add(e.c);
+        if(g.by===me()){s.auto[e.c]=s.auto[e.c]||'받은 카드';s.reveal={c:e.c,by:w,at:now};log('내 추리 '+tri+' → '+nmS(w)+' 「'+cName(e.c)+'」 보여줌')}
+        else if(you)log(nmP(g.by)+' 추리 '+tri+' → 내가 「'+cName(e.c)+'」 보여줌');else log(nmP(g.by)+' 추리 '+tri+' → '+nmS(w)+' 카드 1장 보여줌');
+        beep(880,.15,'triangle',.06);setPh(g.nones.length?'chal':'act',now)}
+      else{const lie=held.length>0;if(lie){s.lieLeft[w]--;g.liars.push(w);s.lies.push({tn:s.tn,by:w,held})}g.nones.push(w);
+        log(nmP(g.by)+' 추리 '+tri+' → '+nm(w)+': '+(you&&lie?'시치미 뗌 🤫':'없어'));beep(300,.12,'triangle',.05);g.ci++;
+        if(g.ci>=g.chain.length){if(g.by===me())s.reveal={c:-1,at:now};setPh('chal',now)}else setPh('reply',now)}}
+    else if(e.k==='ch'){const g=s.sug;if(!g)return;if(e.v&&e.tg!=null){const tg=e.tg;s.chalLeft[w]--;if(g.liars.includes(tg)){s.skip[tg]=1;const held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[tg].includes(c));if(you)held.forEach(c=>s.auto[c]='들킨 카드');if(isBot(w))held.forEach(c=>s.bk[w].known.add(c));
+          bigText(nmS(w)+' '+nm(tg)+'의 거짓말을 잡았다!',true,2200,tg===me());log(nmS(w)+' '+nm(tg)+' 거짓말 잡음! '+(you?'숨긴 카드: '+held.map(cName).join(', '):'')+' ('+nm(tg)+' 한 턴 쉬기)');if(you)confetti(W/2,H/2,30)}
+        else{s.skip[w]=1;bigText(nmT(tg)+' 진짜 없었어! '+nm(w)+' 한 턴 쉬기',true,2200,you);log(nm(w)+' 의심 실패 (한 턴 쉬기)')}}
+      else if(isBot(w)&&g.shownBy<0&&Math.random()<.55){[g.s,g.t,RC(g.r)].forEach(c=>{if(!s.hand[w].includes(c)&&!s.bk[w].known.has(c))s.bk[w].sure[cat(c)]=c})}
+      setPh('act',now)}
+    else if(e.k==='wt'){s.witAsk[w][e.i]=1;const from=s.wit[e.i];s.wit[e.i]=e.to;
+      if(you){const cl=e.cl;if(cl&&cl.length===1)s.auto[cl[0]]=s.auto[cl[0]]||'목격자';log(WIT[e.i].n+': '+(cl?(cl.length===1?'「'+cName(cl[0])+'」는 확실히 아니야':'「'+cName(cl[0])+'」랑 「'+cName(cl[1])+'」 중 적어도 하나는 아니야'):'아무것도 못 봤어…'));s.witMsg={i:e.i,cl,at:now}}
+      else{log(nmS(w)+' '+WIT[e.i].n+'에게 물어봄 ('+ROOMS[from].n+')');if(isBot(w)&&e.cl&&e.cl.length===1)s.bk[w].known.add(e.cl[0])}s.uiDirty=true}
+    else if(e.k==='ac'){const ok=e.s===s.env[0]&&e.t===s.env[1]&&e.rm===s.env[2]-NS-NT;
+      if(ok||w<2){s.acc={w,s:e.s,t:e.t,r:e.rm,ok};s.ended=true;s.endAt=now;s.winner=ok?w:1-w;setPh('over',now);if(s.winner===me())confetti(W/2,H/2,60);beep(ok?990:200,.4,ok?'triangle':'sawtooth',.07)}
+      else{s.out[w]=1;log(nm(w)+' 지목 실패! ('+CHARS[e.s].name+'·'+TOOLS[e.t-NS].n+'·'+ROOMS[e.rm].n+') 탈락');bigText(nm(w)+' 지목 실패! 탈락',true,1800);endTurn(w,now)}}
+    else if(e.k==='end')endTurn(w,now);
   }
-  function act(e){e.w=me();e.q=s.q+1;ap(e);if(!s.o.bot)sendEv(e);render()}
+  function endTurn(w,now){let t=nextP(w);s.tn++;for(let k=0;k<NPL&&s.skip[t];k++){s.skip[t]=0;log(nmP(t)+' 차례 건너뜀');t=nextP(t);s.tn++}
+    s.turn=t;s.sugDone=false;s.sug=null;s.dice=0;s.reveal=null;s.witMsg=null;s.startNode=s.pos[t];s.inRoom=-1;setPh('start',now);if(t===me()){bigText('내 차례!',true,900);beep(880,.12,'triangle',.06)}}
+  function emit(e,w){e.w=w;e.q=s.q+1;ap(e);if(!s.o.bot)sendEv(e);render()}
+  function act(e){emit(e,me())}
   /* ---------- 목격자 단서 ---------- */
-  function witClue(i,w){const r=Math.random;const known=new Set(s.hand[w]);if(w===me()){for(const c in s.auto)known.add(+c)}else s.bk.known.forEach(c=>known.add(c));
-    const inn=s.hand[1-w].filter(c=>!known.has(c));if(!inn.length)return null;
+  function witClue(i,w){const r=Math.random;const known=new Set(s.hand[w]);if(w===me()){for(const c in s.auto)known.add(+c)}else if(s.bk[w])s.bk[w].known.forEach(c=>known.add(c));
+    const inn=[];for(let p=0;p<NPL;p++)if(p!==w)s.hand[p].forEach(c=>{if(!known.has(c))inn.push(c)});if(!inn.length)return null;
     if(r()<.4)return[inn[Math.floor(r()*inn.length)]];
     const b=inn[Math.floor(r()*inn.length)],k=cat(b);let a;const ev=s.env[k];
     if(!known.has(ev)&&r()<.5)a=ev;else{const o=inn.filter(c=>c!==b&&cat(c)===k);a=o.length?o[Math.floor(r()*o.length)]:null}
     if(a==null)return[b];return r()<.5?[a,b]:[b,a]}
   function witMove(i){const used=s.wit.filter((_,j)=>j!==i);const opts=[];for(let r=0;r<NR;r++)if(r!==s.wit[i]&&!used.includes(r))opts.push(r);return opts[Math.floor(Math.random()*opts.length)]}
-  /* ---------- 컴퓨터 ---------- */
-  function botKnow(){const b=s.bk,w=opp();const kn=new Set(s.hand[w]);b.known.forEach(c=>kn.add(c));return kn}
-  function botSolved(){const kn=botKnow(),res=[];for(let k=0;k<3;k++){const lo=[0,NS,NS+NT][k],hi=[NS,NS+NT,N][k];const cand=[];for(let c=lo;c<hi;c++)if(!kn.has(c))cand.push(c);
-      res.push(s.bk.sure[k]!=null&&!kn.has(s.bk.sure[k])?s.bk.sure[k]:cand.length===1?cand[0]:null)}return res}
-  function botStep(now){const w=opp(),b=s.bk;if(s.ended)return;if(!b.at){b.at=now+900+Math.random()*1300;return}if(now<b.at)return;b.at=0;
-    const doit=e=>{e.w=w;e.q=s.q+1;ap(e,now);render()};
-    if(s.ph==='reply'&&s.sug&&s.sug.by===me()){const g=s.sug,held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[w].includes(c));
-      if(!held.length)doit({k:'rp',c:-1});else if(s.lieLeft[w]>0&&s.tn>4&&Math.random()<.22)doit({k:'rp',c:-1});else doit({k:'rp',c:held[Math.floor(Math.random()*held.length)]});return}
-    if(s.turn!==w||s.anim)return;
-    if(s.ph==='start'){const sv=botSolved();if(sv.every(x=>x!=null)){doit({k:'ac',s:sv[0],t:sv[1],r:sv[2]-NS-NT});return}doit({k:'roll',d:1+Math.floor(Math.random()*6)});return}
-    if(s.ph==='move'){const R=reach(w);if(!R.length){doit({k:'end'});return}const kn=botKnow(),sv=botSolved();const want=[];for(let r=0;r<NR;r++)if(RN(r)!==s.startNode&&(!kn.has(RC(r))||sv[2]!=null))want.push(r);
-      let pick=R.find(n=>isRoom(n)&&want.includes(n-1000));if(pick==null){let best=null,bd=1e9;for(const n of R){for(const r of want){const d=bfs(n,-1).dist.get(RN(r));if(d!=null&&d<bd){bd=d;best=n}}}pick=best!=null?best:R[Math.floor(Math.random()*R.length)]}
+  /* ---------- 봇 ---------- */
+  function botKnow(w){const kn=new Set(s.hand[w]);s.bk[w].known.forEach(c=>kn.add(c));return kn}
+  function botSolved(w){const kn=botKnow(w),res=[];for(let k=0;k<3;k++){const lo=[0,NS,NS+NT][k],hi=[NS,NS+NT,N][k];const cand=[];for(let c=lo;c<hi;c++)if(!kn.has(c))cand.push(c);
+      const su=s.bk[w].sure[k];res.push(su!=null&&!kn.has(su)?su:cand.length===1?cand[0]:null)}return res}
+  function whoActs(){if(s.ended)return-1;if(s.ph==='reply'&&s.sug)return s.sug.chain[s.sug.ci];if(s.ph==='chal'&&s.sug)return s.sug.by;return s.turn}
+  function botStep(now){const w=whoActs();if(w<0||!runsBot(w)||s.anim)return;if(!s.botAt){s.botAt=now+800+Math.random()*1200;return}if(now<s.botAt)return;s.botAt=0;const b=s.bk[w];
+    const doit=e=>emit(e,w);
+    if(s.ph==='reply'){const g=s.sug,held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[w].includes(c));
+      if(!held.length)doit({k:'rp',c:-1});else if(s.lieLeft[w]>0&&s.tn>6&&Math.random()<.15)doit({k:'rp',c:-1});else doit({k:'rp',c:held[Math.floor(Math.random()*held.length)]});return}
+    if(s.ph==='chal'){const g=s.sug;if(s.chalLeft[w]>0&&g.nones.length&&Math.random()<.2){doit({k:'ch',v:1,tg:g.nones[Math.floor(Math.random()*g.nones.length)]});return}doit({k:'ch',v:0});return}
+    if(s.ph==='start'){const sv=botSolved(w);if(sv.every(x=>x!=null)&&Math.random()<.5){doit({k:'ac',s:sv[0],t:sv[1],rm:sv[2]-NS-NT});return}doit({k:'roll',d:1+Math.floor(Math.random()*6)});return}
+    if(s.ph==='move'){const R=reach(w);if(!R.length){doit({k:'end'});return}const kn=botKnow(w),sv=botSolved(w);const want=[];for(let r=0;r<NR;r++)if(RN(r)!==s.startNode&&(!kn.has(RC(r))||sv[2]!=null))want.push(r);
+      let pick=R.find(n=>isRoom(n)&&want.includes(n-1000));if(pick==null){let best=null,bd=1e9;for(const n of R){const d0=bfs(n,null).dist;for(const r of want){const d=d0.get(RN(r));if(d!=null&&d<bd){bd=d;best=n}}}pick=best!=null?best:R[Math.floor(Math.random()*R.length)]}
       doit({k:'mv',to:pick});return}
-    if(s.ph==='act'){if(s.inRoom>=0&&!s.sugDone&&RN(s.inRoom)!==s.startNode){const kn=botKnow(),sv=botSolved();
+    if(s.ph==='act'){if(s.inRoom>=0&&!s.sugDone&&RN(s.inRoom)!==s.startNode){const kn=botKnow(w),sv=botSolved(w);
         const pickC=(lo,hi,k)=>{if(sv[k]!=null){const own=s.hand[w].filter(c=>c>=lo&&c<hi);return own.length&&Math.random()<.7?own[Math.floor(Math.random()*own.length)]:sv[k]}const cand=[];for(let c=lo;c<hi;c++)if(!kn.has(c))cand.push(c);return cand.length?cand[Math.floor(Math.random()*cand.length)]:lo};
-        const wi=s.wit.indexOf(s.inRoom);if(wi>=0&&!s.witAsk[w][wi]){const cl=witClue(wi,w);if(cl&&cl.length===1)b.known.add(cl[0]);doit({k:'wt',i:wi,to:witMove(wi),cl});return}
-        doit({k:'sg',s:pickC(0,NS,0),t:pickC(NS,NS+NT,1)});return}
-      const sv=botSolved();if(sv.every(x=>x!=null)&&Math.random()<.6){doit({k:'ac',s:sv[0],t:sv[1],r:sv[2]-NS-NT});return}doit({k:'end'});return}
-    if(s.ph==='chal'&&s.sug&&s.sug.by===w){const g=s.sug;const cs=[g.s,g.t,RC(g.r)].filter(c=>!s.hand[w].includes(c)&&!b.known.has(c));
-      if(s.chalLeft[w]>0&&cs.length>=2&&Math.random()<.25){doit({k:'ch',v:1});return}
-      if(Math.random()<.65)cs.forEach(c=>{b.sure[cat(c)]=c});doit({k:'ch',v:0});return}
+        const wi=s.wit.indexOf(s.inRoom);if(wi>=0&&!s.witAsk[w][wi]){const cl=witClue(wi,w);doit({k:'wt',i:wi,to:witMove(wi),cl});return}
+        const rc=(!kn.has(RC(s.inRoom))||sv[2]!=null)?RC(s.inRoom):pickC(NS+NT,N,2);doit({k:'sg',s:pickC(0,NS,0),t:pickC(NS,NS+NT,1),rm:rc-NS-NT});return}
+      doit({k:'end'});return}
   }
-  function botHearShown(){const g=s.sug;if(g&&g.by===opp()&&g.rep>=0)s.bk.known.add(g.rep)}
-  /* ---------- UI ---------- */
   function css(){if(cssDone)return;cssDone=true;const st=document.createElement('style');st.textContent=`
 #clue{position:fixed;inset:0;z-index:8;pointer-events:none;font-family:var(--f-body)}
 #clue .bar{position:fixed;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(30px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;pointer-events:auto}
@@ -3235,58 +3257,77 @@ const ClueG=(()=>{
 #clue .nb .nm small{color:var(--mute);font-size:11px}
 #clue .nb button{min-width:44px;border-radius:8px;border:1px solid var(--line);background:var(--felt2);color:var(--ink);font:15px var(--f-disp)}
 #clue .nb button.lock{background:#2b2643;color:var(--mute)}
+#clue .hs{position:fixed;left:max(10px,env(safe-area-inset-left,0px));right:calc(max(16px,env(safe-area-inset-right,0px)) + 46px);top:calc(env(safe-area-inset-top,0px) + 54px);display:flex;gap:3px;align-items:center;overflow-x:auto;pointer-events:auto;background:rgba(23,21,43,.82);border:1.5px dashed var(--stitch);border-radius:12px;padding:3px 6px;scrollbar-width:none}
+#clue .hs b{font:11px/1.1 var(--f-disp);color:var(--lamp);white-space:nowrap;margin-right:2px;writing-mode:horizontal-tb}
+#clue .hs span{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;width:31px;background:#fbf1de;border-radius:6px;border-bottom:3px solid var(--cc);padding:2px 0 1px}
+#clue .hs img{width:20px;height:20px;border-radius:50%;object-fit:cover}#clue .hs .ce{font-size:16px;line-height:20px}
+#clue .hs em{font:8.5px/1 var(--f-disp);font-style:normal;color:#2b1b0b;white-space:nowrap;overflow:hidden;max-width:30px;text-overflow:clip}
+#clue .slots{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:2px 0 8px}
+#clue .slot{background:#fbf1de;color:#2b1b0b;border-radius:12px;border-top:5px solid var(--cc);min-height:86px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:13px var(--f-disp)}
+#clue .slot small{font-size:11px;color:#7a5a3a}#clue .slot img{width:36px;height:36px;border-radius:50%;object-fit:cover}#clue .slot .ce{font-size:28px;line-height:38px}#clue .slot i{font:28px var(--f-disp);color:#c9b28f;font-style:normal}
+#clue .nb small.oa{color:#7ec6ff}
+#clue .pf{display:inline-flex;flex-direction:column;align-items:center;gap:2px;font:11px var(--f-disp);color:var(--ink)}#clue .pf img{width:34px;height:34px;border-radius:50%;object-fit:cover;border:3px solid var(--pc)}#clue .pf em{font-style:normal}
+#clue .chain{display:flex;gap:10px;justify-content:center;margin:10px 0 4px}#clue .ci{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 8px;border-radius:12px;background:rgba(255,244,224,.06);min-width:64px}#clue .ci.now{background:rgba(255,212,122,.18);box-shadow:0 0 0 2px var(--lamp)}#clue .ci small{font-size:11px;color:var(--mute);min-height:1.2em}
+#clue .story{background:#fbf1de;color:#2b1b0b;border-radius:14px;padding:12px 14px;font:15px/1.6 var(--f-body)}#clue .story b{font-family:var(--f-disp);font-weight:normal;color:#b5532f}
+#clue .faces{display:flex;flex-wrap:wrap;gap:8px}#clue .faces>span{display:flex;flex-direction:column;align-items:center;font:11px var(--f-disp);gap:2px}#clue .faces>span img{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #ff8a68}#clue .faces em{font-style:normal}
 #clue .memo{width:100%;box-sizing:border-box;background:#fbf1de;color:#2b1b0b;border:2px dashed rgba(122,78,54,.4);border-radius:10px;padding:8px 10px;font:15px/1.45 var(--f-body);resize:vertical}
 #clue .log{font-size:13px;line-height:1.5;color:var(--ink);background:rgba(0,0,0,.2);border-radius:10px;padding:8px 10px;margin-top:8px}
 #clue .log div{border-bottom:1px dashed var(--line);padding:3px 0}
 #clue .wit{display:flex;gap:10px;align-items:center;background:#fbf1de;color:#2b1b0b;border-radius:14px;padding:10px;font:15px/1.4 var(--f-disp)}
 #clue .wit img{width:52px;height:52px;border-radius:50%;object-fit:cover;border:3px solid var(--lamp)}
 `;document.head.appendChild(st)}
-  function build(){css();ui=document.createElement('div');ui.id='clue';ui.innerHTML='<div class="bar"><button type="button" data-a="nb">📒 노트</button><button type="button" data-a="hand">🃏 내 카드</button><button type="button" class="acc" data-a="acc">⚖️ 범인 지목</button></div><div class="sh" hidden></div>';
+  function build(){css();ui=document.createElement('div');ui.id='clue';ui.innerHTML='<div class="hs"></div><div class="bar"><button type="button" data-a="nb">📒 노트</button><button type="button" data-a="hand">🃏 내 카드</button><button type="button" class="acc" data-a="acc">⚖️ 범인 지목</button></div><div class="sh" hidden></div>';
     document.body.appendChild(ui);
-    ui.addEventListener('click',onClick);ui.addEventListener('input',e=>{if(e.target.classList.contains('memo'))s.memo=e.target.value});['keydown','keyup'].forEach(n=>ui.addEventListener(n,e=>{if(e.target.tagName==='TEXTAREA')e.stopPropagation()}));['pointerdown','touchstart'].forEach(n=>ui.addEventListener(n,e=>{if(e.target.closest('.sh,.bar'))e.stopPropagation()}))}
+    ui.addEventListener('click',onClick);ui.querySelector('.hs').addEventListener('click',()=>{s.view=s.view==='hand'?null:'hand';s.shKey='';render()});ui.addEventListener('input',e=>{if(e.target.classList.contains('memo'))s.memo=e.target.value});['keydown','keyup'].forEach(n=>ui.addEventListener(n,e=>{if(e.target.tagName==='TEXTAREA')e.stopPropagation()}));['pointerdown','touchstart'].forEach(n=>ui.addEventListener(n,e=>{if(e.target.closest('.sh,.bar,.hs'))e.stopPropagation()}))}
   const MK={'':'',x:'✕',q:'?',o:'★'},MKN={'':'x',x:'q',q:'o',o:''};
   function mkOf(c){if(s.hand[me()].includes(c))return'내 카드';if(s.auto[c])return s.auto[c];return''}
   function cardBtn(c,o){o=o||{};const m=mkOf(c),u=s.marks[c]||'';const badge=m?'✕':MK[u];return'<button type="button" class="cc'+(o.sel?' sel':'')+(o.held?' held':'')+'" style="--cc:'+CATC[cat(c)]+'" data-c="'+c+'"'+(o.dis?' disabled':'')+'>'+cIcon(c)+'<span>'+cName(c)+'</span>'+(badge&&!o.nob?'<i class="mk">'+badge+'</i>':'')+'</button>'}
   function grp(lo,hi,o,title){let h='<div class="grp">'+title+'</div><div class="cards">';for(let c=lo;c<hi;c++)h+=cardBtn(c,o(c));return h+'</div>'}
-  function sheet(h){const sh=ui.querySelector('.sh');if(h==null){sh.hidden=true;sh.innerHTML='';s.shKey='';return}sh.hidden=false;sh.innerHTML=h}
-  function render(){if(!ui||!s)return;s.uiDirty=false;const bar=ui.querySelector('.bar');bar.querySelector('[data-a=acc]').disabled=!(mine()&&(s.ph==='start'||s.ph==='act')&&!s.anim)||s.ended;
-    const v=s.view;let key='';let h=null;
-    if(s.ended){key='over';const a=s.acc,won=s.winner===me();h='<span class="tt">'+(won?'🎉 사건 해결!':'😢 사건 실패')+'</span><div class="sub">'+(a.w===me()?'내':opName())+' 지목: '+CHARS[a.s].name+' · '+TOOLS[a.t-NS].n+' · '+ROOMS[a.r].n+(a.ok?' → 정답!':' → 틀렸어요!')+'</div><div class="grp">진짜 범인 봉투</div><div class="cards">'+cardBtn(s.env[0],{nob:1})+cardBtn(s.env[1],{nob:1})+cardBtn(s.env[2],{nob:1})+'</div>'+(s.lies.length?'<div class="log">'+s.lies.map(l=>'<div>🤫 '+(l.by===me()?'내가':opName()+'가')+' '+l.tn+'턴에 시치미: '+l.held.map(cName).join(', ')+' 숨김</div>').join('')+'</div>':'<div class="sub">이번 판엔 시치미 없었어요</div>')}
-    else if(v==='nb'){key='nb';h='<span class="tt">📒 추리 노트</span><div class="sub">칸을 누르면 ✕ → ? → ★ 순서로 바뀌어요. ✕ 자동 표시: 내 카드·받은 카드·목격자</div><div class="nb">';
-      for(let c=0;c<N;c++){if(c===0||c===NS||c===NS+NT)h+='<div class="grp" style="grid-column:1/3">'+CATN[cat(c)]+'</div>';const m=mkOf(c);h+='<div class="nm">'+cName(c)+(m?' <small>'+m+'</small>':'')+'</div><button type="button" data-m="'+c+'" class="'+(m?'lock':'')+'">'+(m?'✕':MK[s.marks[c]||''])+'</button>'}
-      h+='</div><div class="grp">✏️ 자유 메모</div><textarea class="memo" rows="4" placeholder="예) 컴퓨터가 부엌 추리할 때 망덩이 냈음…">'+(s.memo||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</textarea><div class="grp">사건 기록</div><div class="log">'+(s.log.length?s.log.slice(0,30).map(l=>'<div>'+l.tn+'턴 · '+l.t+'</div>').join(''):'아직 없어요')+'</div><div class="row"><button type="button" class="g" data-a="close">닫기</button></div>'}
-    else if(v==='hand'){key='hand';h='<span class="tt">🃏 내 카드 '+s.hand[me()].length+'장</span><div class="sub">이 카드들은 범인 봉투에 없어요. 상대가 추리하면 이 중에서 보여줘요.</div><div class="cards">'+s.hand[me()].map(c=>cardBtn(c,{nob:1})).join('')+'</div><div class="sub">🤫 시치미 남음 '+s.lieLeft[me()]+' · 🤨 의심 남음 '+s.chalLeft[me()]+'</div><div class="row"><button type="button" class="g" data-a="close">닫기</button></div>'}
-    else if(v==='acc'){key='acc'+JSON.stringify(s.pick);const p=s.pick;h='<span class="tt">⚖️ 범인 지목</span><div class="sub">셋 다 맞으면 이기고, <b>하나라도 틀리면 바로 져요.</b></div>'+grp(0,NS,c=>({sel:p.s===c}),'누가')+grp(NS,NS+NT,c=>({sel:p.t===c}),'무엇으로')+grp(NS+NT,N,c=>({sel:p.r===c}),'어디서')+'<div class="row"><button type="button" class="g" data-a="close">취소</button><button type="button" class="r" data-a="accgo"'+(p.s==null||p.t==null||p.r==null?' disabled':'')+'>이걸로 지목!</button></div>'}
-    else if(s.ph==='reply'&&s.sug&&s.sug.by!==me()){const g=s.sug,cs=[g.s,g.t,RC(g.r)],held=cs.filter(c=>s.hand[me()].includes(c));key='rep'+s.q;
-      h='<span class="tt">'+opName()+'의 추리</span><div class="sub">「'+cName(g.s)+'」가 「'+cName(g.t)+'」로 「'+cName(RC(g.r))+'」에서 도토리를 훔쳤다!</div><div class="cards">'+cs.map(c=>cardBtn(c,{held:held.includes(c),dis:!held.includes(c),nob:1})).join('')+'</div><div class="sub">'+(held.length?'초록 테두리 카드 중 하나를 눌러 보여줘요. 아니면 시치미를 뗄 수도 있어요 (들키면 한 턴 쉬기).':'가진 카드가 없어요. "없어"를 눌러요.')+'</div><div class="row"><button type="button" class="'+(held.length?'g':'')+'" data-a="none"'+(held.length&&s.lieLeft[me()]<1?' disabled':'')+'>'+(held.length?'🤫 시치미 "없어" (남음 '+s.lieLeft[me()]+')':'없어')+'</button></div>'}
-    else if(s.ph==='reply'&&s.sug&&s.sug.by===me()){key='wait'+s.q;h='<span class="tt">추리 중…</span><div class="sub">'+opName()+'가 보여줄 카드를 고르는 중이에요</div><div class="cards">'+[s.sug.s,s.sug.t,RC(s.sug.r)].map(c=>cardBtn(c)).join('')+'</div><div class="row"><button type="button" class="g" data-a="nb">📒 노트</button></div>'}
-    else if(s.ph==='chal'&&s.sug&&s.sug.by===me()){key='chal'+s.q;h='<span class="tt">'+opName()+': "없어!"</span><div class="sub">진짜 없는 걸까요? 거짓말이면 '+opName()+'가 한 턴 쉬고 숨긴 카드가 공개돼요. 진짜면 내가 한 턴 쉬어요.</div><div class="row"><button type="button" class="r" data-a="ch1"'+(s.chalLeft[me()]<1?' disabled':'')+'>🤨 거짓말이지! (남음 '+s.chalLeft[me()]+')</button><button type="button" data-a="ch0">믿을게</button><button type="button" class="g" data-a="nb">📒 노트</button></div>'}
-    else if(s.ph==='chal'){key='chw'+s.q;h='<span class="tt">'+opName()+'가 의심하는 중…</span><div class="sub">들킬까? 두근두근</div>'}
+  function slots(p){return'<div class="slots">'+[['누가',p.s,0],['무엇으로',p.t,1],['어디서',p.r,2]].map(([n,c,k])=>'<div class="slot" style="--cc:'+CATC[k]+'"><small>'+n+'</small>'+(c!=null?cIcon(c)+'<b>'+cName(c)+'</b>':'<i>?</i>')+'</div>').join('')+'</div>'}
+  function sheet(h){const sh=ui.querySelector('.sh');if(h==null){sh.hidden=true;sh.innerHTML='';s.shKey='';return}sh.hidden=false;sh.innerHTML=h;sh.scrollTop=0}
+  const pfac=i=>'<span class="pf" style="--pc:'+pcol(i)+'">'+faceHTML(s.chr[i])+'<em>'+nm(i)+'</em></span>';
+  function chainHTML(g){return'<div class="chain">'+g.chain.map((p,k)=>{const st=k<g.ci?(g.nones.includes(p)?'✕ 없어':''):k===g.ci&&g.shownBy<0?'고르는 중…':'';const shown=g.shownBy===p;return'<div class="ci'+(k===g.ci&&g.shownBy<0&&s.ph==='reply'?' now':'')+'">'+pfac(p)+'<small>'+(shown?'🃏 보여줌':st)+'</small></div>'}).join('')+'</div>'}
+  const NB='<button type="button" class="g" data-a="nb">📒 노트</button>';
+  function render(){if(!ui||!s)return;s.uiDirty=false;const hs=ui.querySelector('.hs'),hk=s.hand[me()].join(',');if(hs.dataset.k!==hk){hs.dataset.k=hk;hs.innerHTML='<b>내 카드</b>'+s.hand[me()].map(c=>'<span style="--cc:'+CATC[cat(c)]+'">'+cIcon(c)+'<em>'+cName(c)+'</em></span>').join('')}
+    ui.querySelector('.bar [data-a=acc]').disabled=!(mine()&&(s.ph==='start'||s.ph==='act')&&!s.anim)||s.ended;
+    const v=s.view;let key='',h=null;const g=s.sug;
+    if(s.ended){key='over';const a=s.acc,won=s.winner===me();h='<span class="tt">'+(won?'🎉 사건 해결!':s.winner>=2?'🤖 '+nmS(s.winner)+' 먼저 풀었어요':'😢 사건 실패')+'</span><div class="sub">'+nmP(a.w)+' 지목: '+CHARS[a.s].name+' · '+TOOLS[a.t-NS].n+' · '+ROOMS[a.r].n+(a.ok?' → 정답!':' → 틀렸어요!')+'</div><div class="grp">진짜 범인 봉투</div><div class="cards">'+cardBtn(s.env[0],{nob:1})+cardBtn(s.env[1],{nob:1})+cardBtn(s.env[2],{nob:1})+'</div>'+(s.lies.length?'<div class="log">'+s.lies.map(l=>'<div>🤫 '+nmS(l.by)+' '+l.tn+'턴에 시치미: '+l.held.map(cName).join(', ')+' 숨김</div>').join('')+'</div>':'<div class="sub">이번 판엔 시치미 없었어요</div>')}
+    else if(v==='story'){key='story';h='<span class="tt">🌰 도토리 실종 사건</span><div class="story">새벽 3시, 형 방 <b>도토리 단지</b>가 텅 비었다!<br>범인은 코츄단 7명 중 한 명. 집 안 어딘가에서, 무언가를 써서 도토리를 몰래 가져갔다.<br><br>탐정 4명이 수사를 시작한다. <b>누가 · 무엇으로 · 어디서</b>를 가장 먼저 맞히는 탐정이 승리!</div><div class="grp">용의자</div><div class="faces">'+CHARS.map((c,k)=>'<span>'+faceHTML(k)+'<em>'+c.name+'</em></span>').join('')+'</div><div class="grp">탐정 (차례 순서)</div><div class="faces">'+ORDER.map(pfac).join('')+'</div><div class="sub">봇 탐정이 먼저 풀면 이번 판은 무승부예요. 틀리게 지목한 봇은 탈락!</div><div class="row"><button type="button" data-a="tohand">내 카드 보기 →</button></div>'}
+    else if(v==='nb'){const need=needMe();key='nb'+(need?'!':'');h=(need?'<div class="row" style="margin:0 0 8px"><button type="button" class="r" data-a="close">⚠️ 내가 대답할 차례예요 — 노트 닫기</button></div>':'')+'<span class="tt">📒 추리 노트</span><div class="sub">칸을 누르면 ✕ → ? → ★. 자동 ✕: 내 카드·받은 카드·목격자. 파란 글씨 = 다른 탐정이 추리에 쓴 횟수</div><div class="nb">';
+      for(let c=0;c<N;c++){if(c===0||c===NS||c===NS+NT)h+='<div class="grp" style="grid-column:1/3">'+CATN[cat(c)]+'</div>';const m=mkOf(c);h+='<div class="nm">'+cName(c)+(m?' <small>'+m+'</small>':'')+(s.oppAsk[c]?' <small class="oa">'+s.oppAsk[c]+'번 물음</small>':'')+'</div><button type="button" data-m="'+c+'" class="'+(m?'lock':'')+'">'+(m?'✕':MK[s.marks[c]||''])+'</button>'}
+      h+='</div><div class="grp">✏️ 자유 메모</div><textarea class="memo" rows="4" placeholder="예) 미소 탐정이 부엌에서 망덩이 물어봄…">'+(s.memo||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</textarea><div class="grp">사건 기록</div><div class="log">'+(s.log.length?s.log.slice(0,40).map(l=>'<div>'+l.tn+'턴 · '+l.t+'</div>').join(''):'아직 없어요')+'</div><div class="row"><button type="button" class="g" data-a="close">닫기</button></div>'}
+    else if(v==='hand'){key='hand';h='<span class="tt">🃏 내 카드 '+s.hand[me()].length+'장</span><div class="sub">'+(s.first?'<b>게임 시작!</b> ':'')+'이 카드들은 내 거라서 범인이 <b>아니에요</b>. 누가 추리하면 이 중에서 보여줘요. 화면 위에도 계속 떠 있어요.</div><div class="cards">'+s.hand[me()].map(c=>cardBtn(c,{nob:1})).join('')+'</div><div class="sub">🤫 시치미 남음 '+s.lieLeft[me()]+' · 🤨 의심 남음 '+s.chalLeft[me()]+'</div><div class="row"><button type="button" class="g" data-a="close">'+(s.first?'수사 시작!':'닫기')+'</button></div>'}
+    else if(v==='acc'){key='acc'+JSON.stringify(s.pick);const p=s.pick;h='<span class="tt">⚖️ 범인 지목</span>'+slots(p)+'<div class="sub">셋 다 맞으면 이기고, <b>하나라도 틀리면 바로 져요.</b></div>'+grp(0,NS,c=>({sel:p.s===c}),'누가')+grp(NS,NS+NT,c=>({sel:p.t===c}),'무엇으로')+grp(NS+NT,N,c=>({sel:p.r===c}),'어디서')+'<div class="row"><button type="button" class="g" data-a="close">취소</button><button type="button" class="r" data-a="accgo"'+(p.s==null||p.t==null||p.r==null?' disabled':'')+'>이걸로 지목!</button></div>'}
+    else if(v==='sug'&&s.ph==='act'){key='sug'+JSON.stringify(s.pick);const p=s.pick;h='<span class="tt">🔍 추리하기</span>'+slots(p)+'<div class="sub">셋 다 골라요. 다음 탐정부터 차례로, 가진 카드 1장을 나한테만 보여줘요 (시치미 뗄 수도!)</div>'+grp(0,NS,c=>({sel:p.s===c}),'누가')+grp(NS,NS+NT,c=>({sel:p.t===c}),'무엇으로')+grp(NS+NT,N,c=>({sel:p.r===c}),'어디서')+'<div class="row"><button type="button" class="g" data-a="cancel">취소</button>'+NB+'<button type="button" data-a="suggo"'+(p.s==null||p.t==null||p.r==null?' disabled':'')+'>추리!</button></div>'}
+    else if(s.ph==='reply'&&g){const cs=[g.s,g.t,RC(g.r)],cur=g.chain[g.ci];const head='<span class="tt">'+(g.by===me()?'내 추리':nm(g.by)+'의 추리')+'</span><div class="sub">「'+cName(g.s)+'」가 「'+cName(g.t)+'」로 「'+cName(RC(g.r))+'」에서 도토리를 훔쳤다!</div>';
+      if(cur===me()){const held=cs.filter(c=>s.hand[me()].includes(c));key='rep'+s.q;h=head+'<div class="cards">'+cs.map(c=>cardBtn(c,{held:held.includes(c),dis:!held.includes(c),nob:1})).join('')+'</div><div class="sub"><b>내가 대답할 차례!</b> '+(held.length?'초록 테두리 카드 중 하나를 눌러 '+nm(g.by)+'에게만 보여줘요. 시치미를 뗄 수도 있어요 (들키면 한 턴 쉬기).':'가진 카드가 없어요. "없어"를 눌러요.')+'</div><div class="row">'+NB+'<button type="button" class="'+(held.length?'g':'')+'" data-a="none"'+(held.length&&s.lieLeft[me()]<1?' disabled':'')+'>'+(held.length?'🤫 시치미 "없어" (남음 '+s.lieLeft[me()]+')':'없어')+'</button></div>'}
+      else{key='rw'+s.q;h=head+'<div class="cards">'+cs.map(c=>cardBtn(c)).join('')+'</div>'+chainHTML(g)+'<div class="row">'+NB+'</div>'}}
+    else if(s.ph==='chal'&&g){if(g.by===me()){key='chal'+s.q;const sh=g.shownBy>=0;h='<span class="tt">'+(sh?nmS(g.shownBy)+' 「'+cName(g.rep)+'」를 보여줬어요':'아무도 카드를 안 보여줬어요!')+'</span>'+(sh?'<div class="big">'+cardBtn(g.rep,{nob:1})+'</div>':'')+chainHTML(g)+'<div class="sub">"없어"라고 한 탐정 중에 거짓말쟁이가 있을까요? 잡으면 그 탐정이 한 턴 쉬고 숨긴 카드가 공개돼요. 틀리면 내가 한 턴 쉬어요. (의심 남음 '+s.chalLeft[me()]+')</div><div class="row">'+g.nones.map(p=>'<button type="button" class="r" data-a="ch1" data-tg="'+p+'"'+(s.chalLeft[me()]<1?' disabled':'')+'>🤨 '+nm(p)+' 거짓말!</button>').join('')+'<button type="button" data-a="ch0">다 믿을게</button>'+NB+'</div>'}
+      else{key='chw'+s.q;h='<span class="tt">'+nmS(g.by)+' 의심할지 고민 중…</span>'+chainHTML(g)+'<div class="row">'+NB+'</div>'}}
     else if(mine()&&s.ph==='act'&&!s.anim){key='act'+s.q+(s.reveal?'r':'')+(s.witMsg?'w':'');let top='';
-      if(s.sug&&s.sug.by===me()){const g=s.sug,cs=[g.s,g.t,RC(g.r)];top='<div class="sub">내 추리 (누가 · 무엇으로 · 어디서)</div><div class="cards">'+cs.map(c=>cardBtn(c,{held:s.reveal&&s.reveal.c===c,dis:s.reveal&&s.reveal.c!==c,nob:1})).join('')+'</div>'}
-      if(s.reveal)top+='<div class="sub">'+opName()+'가 보여준 카드 (노트에 자동으로 ✕ 표시돼요)</div><div class="big">'+cardBtn(s.reveal.c,{nob:1})+'</div>';
+      if(g&&g.by===me()){const cs=[g.s,g.t,RC(g.r)];top='<div class="sub">내 추리 (누가 · 무엇으로 · 어디서)</div><div class="cards">'+cs.map(c=>cardBtn(c,{held:g.rep===c,dis:g.shownBy>=0&&g.rep!==c,nob:1})).join('')+'</div>';
+        top+=g.shownBy>=0?'<div class="sub">'+nmS(g.shownBy)+' 보여준 카드 (노트에 자동 ✕)</div><div class="big">'+cardBtn(g.rep,{nob:1})+'</div>':'<div class="sub"><b>아무도 안 보여줬어요!</b> 내 카드가 아닌 건 범인일 수도… (시치미가 없었다면)</div>'}
       if(s.witMsg){const wm=s.witMsg,W2=WIT[wm.i];top+='<div class="wit"><img alt="" src="'+W2.im().src+'"><div><b>'+W2.n+'</b>: '+W2.l+'<br>'+(wm.cl?(wm.cl.length===1?'「'+cName(wm.cl[0])+'」는 확실히 아니야!':'「'+cName(wm.cl[0])+'」랑 「'+cName(wm.cl[1])+'」, 둘 중 적어도 하나는 아니야!'):'아무것도 못 봤어…')+'</div></div>'}
       const inR=s.inRoom>=0,canSug=inR&&!s.sugDone&&RN(s.inRoom)!==s.startNode,wi=inR?s.wit.indexOf(s.inRoom):-1,canW=wi>=0&&!s.witAsk[me()][wi];
-      h='<span class="tt">'+(inR?ROOMS[s.inRoom].e+' '+ROOMS[s.inRoom].n:'복도')+'</span>'+top+'<div class="row">'+(canSug?'<button type="button" data-a="sug">🔍 여기서 추리하기</button>':'')+(canW?'<button type="button" data-a="wit">🗣 '+WIT[wi].n+'에게 묻기</button>':'')+'<button type="button" class="g" data-a="nb">📒 노트</button><button type="button" class="g" data-a="end">턴 끝내기</button></div>'+(inR&&!s.sugDone&&!canSug?'<div class="sub">방금 있던 방에선 다시 추리할 수 없어요</div>':'')}
-    else if(v==='sug'){}
-    if(v==='sug'&&!s.ended&&s.ph==='act'){key='sug'+JSON.stringify(s.pick);const p=s.pick;h='<span class="tt">🔍 '+ROOMS[s.inRoom].n+'에서 추리</span><div class="sub">누가, 무엇으로? '+opName()+'가 셋 중 가진 카드 1장을 보여줘요 (거짓말할 수도!)</div>'+grp(0,NS,c=>({sel:p.s===c}),'누가')+grp(NS,NS+NT,c=>({sel:p.t===c}),'무엇으로')+'<div class="row"><button type="button" class="g" data-a="cancel">취소</button><button type="button" data-a="suggo"'+(p.s==null||p.t==null?' disabled':'')+'>추리!</button></div>'}
+      if(inR||top){h='<span class="tt">'+(inR?ROOMS[s.inRoom].e+' '+ROOMS[s.inRoom].n:'복도')+'</span>'+top+'<div class="row">'+(canSug?'<button type="button" data-a="sug">🔍 추리하기</button>':'')+(canW?'<button type="button" data-a="wit">🗣 '+WIT[wi].n+'에게 묻기</button>':'')+NB+'<button type="button" class="g" data-a="end">턴 끝내기</button></div>'+(inR&&!s.sugDone&&!canSug?'<div class="sub">방금 있던 방에선 다시 추리할 수 없어요</div>':'')}}
     if(key!==s.shKey){s.shKey=key;sheet(h)}}
-  function onClick(e){const b=e.target.closest('button');if(!b||!s)return;audioInit();const a=b.dataset.a,now=performance.now();
+  function onClick(e){const b=e.target.closest('button');if(!b||!s)return;audioInit();const a=b.dataset.a;
     if(b.dataset.m!=null){const c=+b.dataset.m;if(mkOf(c))return;s.marks[c]=MKN[s.marks[c]||''];s.shKey='';render();return}
     if(b.dataset.c!=null){const c=+b.dataset.c;
-      if((s.view==='sug'||s.view==='acc')){const p=s.pick;if(c<NS)p.s=c;else if(c<NS+NT)p.t=c;else if(s.view==='acc')p.r=c;render();return}
-      if(s.ph==='reply'&&s.sug&&s.sug.by!==me()&&s.hand[me()].includes(c)){act({k:'rp',c});return}return}
+      if(s.view==='sug'||s.view==='acc'){const p=s.pick;if(c<NS)p.s=c;else if(c<NS+NT)p.t=c;else p.r=c;render();return}
+      if(s.ph==='reply'&&s.sug&&s.sug.chain[s.sug.ci]===me()&&s.hand[me()].includes(c)&&!s.view){act({k:'rp',c});return}return}
     if(a==='nb'||a==='hand'){s.view=s.view===a?null:a;s.shKey='';render();return}
-    if(a==='close'||a==='cancel'){s.view=null;s.shKey='';render();return}
+    if(a==='tohand'){s.view='hand';render();return}
+    if(a==='close'||a==='cancel'){s.view=null;s.first=false;s.shKey='';render();return}
     if(a==='acc'){if(!mine())return;s.view='acc';s.pick={};render();return}
-    if(a==='accgo'){const p=s.pick;s.view=null;act({k:'ac',s:p.s,t:p.t,r:p.r-NS-NT});return}
-    if(a==='sug'){s.view='sug';s.pick={};render();return}
-    if(a==='suggo'){const p=s.pick;s.view=null;s.reveal=null;s.witMsg=null;act({k:'sg',s:p.s,t:p.t});return}
+    if(a==='accgo'){const p=s.pick;s.view=null;act({k:'ac',s:p.s,t:p.t,rm:p.r-NS-NT});return}
+    if(a==='sug'){s.view='sug';s.pick={r:RC(s.inRoom)};render();return}
+    if(a==='suggo'){const p=s.pick;s.view=null;s.witMsg=null;act({k:'sg',s:p.s,t:p.t,rm:p.r-NS-NT});return}
     if(a==='wit'){const wi=s.wit.indexOf(s.inRoom);if(wi<0)return;act({k:'wt',i:wi,to:witMove(wi),cl:witClue(wi,me())});return}
-    if(a==='end'){act({k:'end'});return}
+    if(a==='end'){if(s.ph==='act'&&mine())act({k:'end'});return}
     if(a==='none'){act({k:'rp',c:-1});return}
-    if(a==='ch1'||a==='ch0'){act({k:'ch',v:a==='ch1'?1:0});return}}
-  /* ---------- 그리기 ---------- */
+    if(a==='ch1'){act({k:'ch',v:1,tg:+b.dataset.tg});return}
+    if(a==='ch0'){act({k:'ch',v:0});return}}
   function felt(R,x,y,w,h,t){ctx.save();ctx.fillStyle='rgba(0,0,0,.28)';rr(x+2,y+4,w,h,10);ctx.fill();ctx.fillStyle=R.c;rr(x,y,w,h,10);ctx.fill();ctx.save();rr(x,y,w,h,10);ctx.clip();
     ctx.globalAlpha=.16;ctx.fillStyle='#fff';ctx.strokeStyle='#fff';ctx.lineWidth=3;
     if(R.p===0){for(let i=-h;i<w;i+=12){ctx.beginPath();ctx.moveTo(x+i,y+h);ctx.lineTo(x+i+h,y);ctx.stroke()}}
@@ -3296,7 +3337,7 @@ const ClueG=(()=>{
     else if(R.p===4){ctx.globalAlpha=.14;for(let xx=x;xx<x+w;xx+=14)ctx.fillRect(xx,y,7,h);for(let yy=y;yy<y+h;yy+=14)ctx.fillRect(x,yy,w,7)}
     else if(R.p===5){ctx.lineWidth=1.5;for(let xx=x;xx<x+w;xx+=16){ctx.beginPath();ctx.moveTo(xx,y);ctx.lineTo(xx,y+h);ctx.stroke()}for(let yy=y;yy<y+h;yy+=16){ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(x+w,yy);ctx.stroke()}}
     ctx.restore();ctx.strokeStyle='rgba(255,244,224,.55)';ctx.lineWidth=1.6;ctx.setLineDash([4,3]);rr(x+4,y+4,w-8,h-8,7);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
-  function draw(now){const t=now/1000,{cs,ox,oy}=L();screen();ctx.fillStyle='#1d1a3a';ctx.fillRect(0,0,W,H);
+  function draw(now){const t=now/1000,{cs,ox,oy}=L();s.reachSet=mine()&&s.ph==='move'&&!s.anim?new Set(reach(me())):null;screen();ctx.fillStyle='#1d1a3a';ctx.fillRect(0,0,W,H);
     const g0=ctx.createRadialGradient(W/2,H*.45,20,W/2,H*.45,Math.max(W,H)*.7);g0.addColorStop(0,'rgba(255,213,154,.12)');g0.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g0;ctx.fillRect(0,0,W,H);
     // 바닥 매트
     const bw=cs*GX,bh=cs*GY;ctx.fillStyle='rgba(0,0,0,.35)';rr(ox-6,oy-2,bw+12,bh+12,16);ctx.fill();ctx.fillStyle='#7a4e36';rr(ox-7,oy-7,bw+14,bh+14,16);ctx.fill();
@@ -3310,65 +3351,78 @@ const ClueG=(()=>{
     ROOMS.forEach((R,i)=>{const x=ox+R.x*cs+2,y=oy+R.y*cs+2,w=R.w*cs-4,h=R.h*cs-4;felt(R,x,y,w,h,t);
       ctx.font=Math.round(cs*.95)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.globalAlpha=.85;ctx.fillText(R.e,x+w/2,y+h*.42);ctx.globalAlpha=1;ctx.textBaseline='alphabetic';
       ctx.font='12px Jua, sans-serif';const tw=ctx.measureText(R.n).width+12;ctx.fillStyle='#fbf1de';rr(x+5,y+5,tw,17,5);ctx.fill();ctx.fillStyle='#3a2414';ctx.textAlign='left';ctx.fillText(R.n,x+11,y+18);
-      R.d.forEach(([dx,dy])=>{const px=ox+(dx+.5)*cs,py=oy+(dy+.5)*cs;ctx.fillStyle='rgba(122,78,54,.35)';ctx.beginPath();ctx.arc(px,py,cs*.3,0,7);ctx.fill();ctx.fillStyle='#fbf1de';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText('🚪',px,py+4)});
+      const hl=mine()&&s.ph==='move'&&!s.anim&&s.reachSet&&s.reachSet.has(RN(i));
+      R.d.forEach(([dx,dy])=>{let ang=0;if(dy>=R.y+R.h)ang=-Math.PI/2;else if(dy<R.y)ang=Math.PI/2;else if(dx>=R.x+R.w)ang=Math.PI;else ang=0;
+        const px=ox+(dx+.5)*cs,py=oy+(dy+.5)*cs,ex=px+Math.cos(ang)*cs*.5,ey=py+Math.sin(ang)*cs*.5;
+        ctx.save();ctx.translate(ex,ey);ctx.rotate(ang+Math.PI/2);ctx.fillStyle='#ead9b8';ctx.fillRect(-cs*.36,-5,cs*.72,10);ctx.strokeStyle='#7a4e36';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-cs*.38,-4);ctx.lineTo(-cs*.38,5);ctx.moveTo(cs*.38,-4);ctx.lineTo(cs*.38,5);ctx.stroke();ctx.restore();
+        const pu=hl?.6+.4*Math.sin(t*7):0;ctx.fillStyle=hl?'rgba(255,212,122,'+(.55+pu*.45)+')':'#a5714a';rr(px-cs*.42,py-cs*.32,cs*.84,cs*.64,6);ctx.fill();ctx.strokeStyle='rgba(255,244,224,.7)';ctx.setLineDash([2,2]);ctx.lineWidth=1;rr(px-cs*.36,py-cs*.26,cs*.72,cs*.52,4);ctx.stroke();ctx.setLineDash([]);
+        ctx.save();ctx.translate(px,py);ctx.rotate(ang);ctx.fillStyle=hl?'#3a2414':'#fbf1de';ctx.beginPath();ctx.moveTo(cs*.22,0);ctx.lineTo(-cs*.06,-cs*.16);ctx.lineTo(-cs*.06,cs*.16);ctx.fill();ctx.fillRect(-cs*.22,-cs*.05,cs*.18,cs*.1);ctx.restore();
+        if(hl){ctx.fillStyle='#ffd47a';ctx.font='11px Jua, sans-serif';ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(23,21,43,.9)';const ly=py+(dy>=R.y+R.h?cs*.62:-cs*.5);ctx.strokeText('입구',px,ly);ctx.fillText('입구',px,ly)}});
       // 용의자·도구 말
       const items=[];CHARS.forEach((c,k)=>{if(s.sus[k]===i)items.push({ch:k})});TOOLS.forEach((tl,k)=>{if(s.tool[k]===i)items.push({e:tl.e})});
       items.forEach((it,k)=>{const cols=Math.max(1,Math.floor((w-8)/18)),ix=x+12+(k%cols)*18,iy=y+30+Math.floor(k/cols)*18;if(it.ch!=null)drawToken(ix,iy,it.ch,{scale:.5});else{ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText(it.e,ix,iy+5)}});
       const wi=s.wit.indexOf(i);if(wi>=0){const im=WIT[wi].im(),wx=x+w-16,wy=y+h-38+Math.sin(t*2+i)*2;ctx.save();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(wx,wy,12,0,7);ctx.fill();if(im.complete&&im.naturalWidth){ctx.beginPath();ctx.arc(wx,wy,10.5,0,7);ctx.clip();ctx.drawImage(im,wx-10.5,wy-10.5,21,21)}ctx.restore();
         if(!s.witAsk[me()][wi]){ctx.fillStyle='#ffd47a';ctx.font='12px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('💬',wx+11,wy-10)}}});
     // 이동 가능 칸
-    if(mine()&&s.ph==='move'&&!s.anim){const pulse=.45+.3*Math.sin(t*6);reach(me()).forEach(n=>{if(isRoom(n)){const R=ROOMS[n-1000];ctx.strokeStyle='rgba(255,212,122,'+pulse+')';ctx.lineWidth=4;rr(ox+R.x*cs+2,oy+R.y*cs+2,R.w*cs-4,R.h*cs-4,10);ctx.stroke()}
+    if(mine()&&s.ph==='move'&&!s.anim){const pulse=.45+.3*Math.sin(t*6);reach(me()).forEach(n=>{if(isRoom(n)){const R=ROOMS[n-1000];ctx.strokeStyle='rgba(255,212,122,'+pulse+')';ctx.lineWidth=4;rr(ox+R.x*cs+2,oy+R.y*cs+2,R.w*cs-4,R.h*cs-4,10);ctx.stroke();ctx.fillStyle='rgba(255,212,122,.18)';ctx.fill();ctx.font='12px Jua, sans-serif';const lb='여기로 입장';const tw=ctx.measureText(lb).width+12,lx=ox+(R.x+R.w/2)*cs,lyy=oy+(R.y+R.h)*cs-14;ctx.fillStyle='#ffd47a';rr(lx-tw/2,lyy-9,tw,17,8);ctx.fill();ctx.fillStyle='#3a2414';ctx.textAlign='center';ctx.fillText(lb,lx,lyy+4)}
       else{const x=n%GX,y=(n/GX)|0;ctx.fillStyle='rgba(255,212,122,'+(pulse*.6)+')';rr(ox+x*cs+3,oy+y*cs+3,cs-6,cs-6,6);ctx.fill()}})}
     // 탐정 말
-    [0,1].forEach(w=>{let [x,y]=nodeXY(s.pos[w],w);if(s.anim&&s.anim.w===w){const k=(now-s.anim.t0)/140,p=s.anim.p;if(k>=p.length-1)s.anim=null;else{const i=Math.floor(k),f=k-i,[ax,ay]=nodeXY(p[i],w),[bx,by]=nodeXY(p[i+1],w);x=ax+(bx-ax)*f;y=ay+(by-ay)*f-Math.sin(f*Math.PI)*6}}
-      if(!isRoom(s.pos[w])&&s.pos[0]===s.pos[1])x+=w?5:-5;const mineW=w===me();drawToken(x,y,mineW?s.o.myC:s.o.oppC,{scale:.78,col:mineW?'#ff8a68':'#7ec6ff',bob:t*3+w});
-      ctx.fillStyle='#3a2414';ctx.beginPath();ctx.ellipse(x,y-11,9,3.5,0,0,7);ctx.fill();ctx.fillStyle='#8a5a3a';ctx.beginPath();ctx.ellipse(x,y-14,6,5,0,Math.PI,0);ctx.fill();
-      if(s.turn===w&&!s.ended){ctx.fillStyle=mineW?'#ff8a68':'#7ec6ff';ctx.font='12px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('▼',x,y-22+Math.sin(t*6)*2)}});
+    const occ={};for(let w=0;w<NPL;w++){let [x,y]=nodeXY(s.pos[w],w);if(s.anim&&s.anim.w===w){const k=(now-s.anim.t0)/140,p=s.anim.p;if(k>=p.length-1)s.anim=null;else{const i=Math.floor(k),f=k-i,[ax,ay]=nodeXY(p[i],w),[bx,by]=nodeXY(p[i+1],w);x=ax+(bx-ax)*f;y=ay+(by-ay)*f-Math.sin(f*Math.PI)*6}}
+      const col=pcol(w);drawToken(x,y,s.chr[w],{scale:.72,col,bob:t*3+w,alpha:s.out[w]?.4:1});
+      ctx.fillStyle='#3a2414';ctx.beginPath();ctx.ellipse(x,y-10,8,3.2,0,0,7);ctx.fill();ctx.fillStyle='#8a5a3a';ctx.beginPath();ctx.ellipse(x,y-13,5.5,4.5,0,Math.PI,0);ctx.fill();
+      const lb=w===me()?'나':w<2?opName():'봇';ctx.font='9px Jua, sans-serif';const tw=ctx.measureText(lb).width+6;ctx.fillStyle=col;rr(x-tw/2,y+9,tw,11,5);ctx.fill();ctx.fillStyle='#2b1b0b';ctx.textAlign='center';ctx.fillText(lb,x,y+17.5);
+      if(s.turn===w&&!s.ended){ctx.fillStyle=col;ctx.font='13px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('▼',x,y-20+Math.sin(t*6)*2)}}
+    // 방 멘트
+    if(s.talk&&now>s.talk.at&&now-s.talk.at<2800){const R=ROOMS[s.talk.r],cx=ox+(R.x+R.w/2)*cs,cy=oy+(R.y+R.h*.42)*cs,a=Math.min(1,(now-s.talk.at)/200,(2800-(now-s.talk.at))/300);ctx.save();ctx.globalAlpha=a;
+      ctx.font='13px Jua, sans-serif';const tx=s.talk.txt,tw=Math.min(W-40,ctx.measureText(tx).width+50),bx=clamp(cx-tw/2,10,W-10-tw),by=cy-34;ctx.fillStyle='rgba(0,0,0,.3)';rr(bx+2,by+3,tw,32,14);ctx.fill();ctx.fillStyle='#fbf1de';rr(bx,by,tw,32,14);ctx.fill();ctx.strokeStyle='rgba(122,78,54,.4)';ctx.setLineDash([3,2]);ctx.lineWidth=1.5;rr(bx+3,by+3,tw-6,26,11);ctx.stroke();ctx.setLineDash([]);
+      ctx.beginPath();ctx.moveTo(cx-6,by+31);ctx.lineTo(cx,by+40);ctx.lineTo(cx+6,by+31);ctx.fillStyle='#fbf1de';ctx.fill();
+      if(s.talk.ch>=0)drawToken(bx+18,by+16,s.talk.ch,{scale:.62});else if(s.talk.wi>=0){const im=WIT[s.talk.wi].im();if(im.complete&&im.naturalWidth){ctx.save();ctx.beginPath();ctx.arc(bx+18,by+16,11,0,7);ctx.clip();ctx.drawImage(im,bx+7,by+5,22,22);ctx.restore()}}else{ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('🔎',bx+18,by+22)}
+      ctx.fillStyle='#3a2414';ctx.font='13px Jua, sans-serif';ctx.textAlign='left';ctx.fillText(tx,bx+34,by+21);ctx.restore()}
     // 주사위
     if(s.rollAt&&now-s.rollAt<1300){const e=(now-s.rollAt)/1300,sz=64,cx=W/2,cy=oy+bh/2;const face=e<.6?1+Math.floor((now/70)%6):s.dice||1;ctx.save();ctx.translate(cx,cy);ctx.rotate(e<.6?Math.sin(now/40)*.5:0);
       ctx.fillStyle='rgba(0,0,0,.35)';rr(-sz/2+3,-sz/2+6,sz,sz,14);ctx.fill();ctx.fillStyle='#fbf1de';rr(-sz/2,-sz/2,sz,sz,14);ctx.fill();ctx.strokeStyle='rgba(122,78,54,.5)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(-sz/2+5,-sz/2+5,sz-10,sz-10,10);ctx.stroke();ctx.setLineDash([]);
       const P=[[],[[0,0]],[[-1,-1],[1,1]],[[-1,-1],[0,0],[1,1]],[[-1,-1],[1,-1],[-1,1],[1,1]],[[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],[[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]]][face];
       ctx.fillStyle='#c9772f';P.forEach(([a,b])=>{ctx.beginPath();ctx.arc(a*15,b*15,6,0,7);ctx.fill()});ctx.restore()}
     drawBubble(W*.2,96,C.bub.op,now);drawParts()}
-  function hudTxt(){if(s.ended)return s.winner===me()?'사건 해결!':'사건 실패';const ti=Math.max(0,Math.ceil(LIM[s.ph]-(performance.now()-s.phAt)/1000));
-    if(s.ph==='reply')return s.sug&&s.sug.by===me()?opName()+' 대답 기다리는 중':'카드 보여줘요 '+ti+'초';
-    if(s.ph==='chal')return s.sug&&s.sug.by===me()?'의심할까? '+ti+'초':opName()+' 고민 중';
-    if(!mine())return opName()+' 차례';return s.ph==='start'?'주사위 굴려요 '+ti+'초':s.ph==='move'?'갈 칸을 눌러요 '+ti+'초':'내 차례 '+ti+'초'}
-  const LIM={start:45,move:45,act:90,reply:35,chal:20,over:99};
+  function hudTxt(){if(s.ended)return s.winner===me()?'사건 해결!':s.winner>=2?'봇이 먼저 풀었어요':'사건 실패';const ti=Math.max(0,Math.ceil(LIM[s.ph]-(performance.now()-s.phAt)/1000));const g=s.sug;
+    if(s.ph==='reply'&&g){const cur=g.chain[g.ci];return cur===me()?'내가 대답할 차례 '+ti+'초':nm(cur)+' 대답 중'}
+    if(s.ph==='chal'&&g)return g.by===me()?'의심할까? '+ti+'초':nm(g.by)+' 고민 중';
+    if(!mine())return nm(s.turn)+' 차례';return s.ph==='start'?'주사위 굴려요 '+ti+'초':s.ph==='move'?'빛나는 칸·방을 눌러요 '+ti+'초':'내 차례 '+ti+'초'}
+  const LIM={start:45,move:45,act:90,reply:35,chal:25,over:99};
   return{
     id:'clue',name:'코츄 클루도',btn:'굴리기',stat:null,tapPos:true,
-    rules:['도토리 단지에서 도토리가 사라졌다! 범인 봉투엔 누가 · 무엇으로 · 어디서 카드가 1장씩 숨겨져 있어요. 나머지 카드는 둘이 나눠 가져요.','주사위를 굴려 방에 들어가면 추리! 상대는 셋 중 가진 카드 1장을 보여줘야 해요. 단, 한 판에 1번은 🤫 시치미("없어")를 뗄 수 있어요. 의심해서 잡으면 상대가 한 턴 쉬고, 틀리면 내가 쉬어요.','방에 있는 목격자(파이리·브케인·갈매기)에게 물으면 단서를 줘요. ⚖️ 범인 지목은 언제든 내 차례에 — 맞히면 승리, 틀리면 바로 패배!'],
+    rules:['도토리 단지에서 도토리가 사라졌다! 범인 봉투엔 누가 · 무엇으로 · 어디서 카드가 1장씩 숨겨져 있어요. 나머지 카드는 탐정 4명(나·상대·봇 2명)이 나눠 가져요.','주사위를 굴려 방에 들어가면 추리! 다음 탐정부터 차례로, 가진 카드 1장을 추리한 사람에게만 보여줘요. 한 판에 1번은 🤫 시치미("없어")를 뗄 수 있어요. 의심해서 잡으면 그 탐정이 한 턴 쉬고, 틀리면 내가 쉬어요.','방의 목격자(파이리·브케인·갈매기)에게 물으면 단서를 줘요. ⚖️ 범인 지목: 맞히면 승리, 틀리면 패배! 봇이 먼저 맞히면 무승부.'],
     init(o){const r=mulberry32(o.seed^0xc1ed0);const env=[Math.floor(r()*NS),NS+Math.floor(r()*NT),NS+NT+Math.floor(r()*NR)];const rest=[];for(let c=0;c<N;c++)if(!env.includes(c))rest.push(c);shuffle(rest,r);
-      const first=(o.seed>>>4)&1,hand=[[],[]];rest.forEach((c,i)=>hand[(i+first+1)%2].push(c));hand.forEach(h=>h.sort((a,b)=>a-b));
-      const rooms=shuffle([0,1,2,3,4,5,6,7,8],r);
-      s={o,env,hand,turn:first,tn:1,q:0,ph:'start',phAt:o.now,pos:[16*GX+4,0*GX+8],sus:CHARS.map(()=>Math.floor(r()*NR)),tool:TOOLS.map(()=>Math.floor(r()*NR)),wit:rooms.slice(0,3),witAsk:[[0,0,0],[0,0,0]],
-        lieLeft:[1,1],chalLeft:[2,2],skip:[0,0],sug:null,sugDone:false,inRoom:-1,dice:0,rollAt:0,anim:null,log:[],marks:{},auto:{},lies:[],view:null,pick:{},shKey:'',pend:{},ended:false,endAt:0,winner:-1,startNode:-1,
-        bk:{at:0,known:new Set(),sure:{}}};s.startNode=s.pos[s.turn];
-      if(!ui)build();ui.hidden=false;s.shKey='x';render();bigText(s.turn===o.me?'내가 먼저!':opName()+'가 먼저!',true,1300)},
+      const first=(o.seed>>>4)&1,hand=[[],[],[],[]],fi=ORDER.indexOf(first);rest.forEach((c,i)=>hand[ORDER[(fi+1+i)%NPL]].push(c));hand.forEach(h=>h.sort((a,b)=>a-b));
+      const rooms=shuffle([0,1,2,3,4,5,6,7,8],r);const chr=[];chr[o.me]=o.myC;chr[1-o.me]=o.oppC;const pool=CHARS.map((_,k)=>k).filter(k=>k!==o.myC&&k!==o.oppC);shuffle(pool,r);chr[2]=pool[0];chr[3]=pool[1];
+      s={o,env,hand,chr,turn:first,tn:1,q:0,ph:'start',phAt:o.now+20000,pos:[16*GX+4,0*GX+8,4*GX+0,12*GX+12],sus:CHARS.map(()=>Math.floor(r()*NR)),tool:TOOLS.map(()=>Math.floor(r()*NR)),wit:rooms.slice(0,3),witAsk:[[0,0,0],[0,0,0],[0,0,0],[0,0,0]],
+        oppAsk:{},lieLeft:[1,1,1,1],chalLeft:[2,2,2,2],skip:[0,0,0,0],out:[0,0,0,0],sug:null,sugDone:false,inRoom:-1,dice:0,rollAt:0,anim:null,log:[],marks:{},auto:{},lies:[],view:'story',first:true,pick:{},shKey:'x',pend:{},ended:false,endAt:0,winner:-1,startNode:-1,botAt:0,talk:null,
+        bk:[0,1,2,3].map(()=>({known:new Set(),sure:{}}))};s.startNode=s.pos[s.turn];
+      if(!ui)build();ui.hidden=false;render()},
     step(dt,now,inp){if(!s)return;
-      while(s.pend[s.q+1]){const e=s.pend[s.q+1];delete s.pend[s.q+1];ap(e,now);s.uiDirty=true}
-      if(s.o.bot){botStep(now);botHearShown()}
+      while(s.pend[s.q+1]){const e=s.pend[s.q+1];delete s.pend[s.q+1];ap(e,now)}
+      botStep(now);
       if(s.ended){if(s.uiDirty)render();return}
       const el=(now-s.phAt)/1000,lim=LIM[s.ph]||60;
-      if(mine()&&!s.anim){if(s.ph==='start'&&inp.pressed){act({k:'roll',d:1+Math.floor(Math.random()*6)})}
+      if(mine()&&!s.anim){if(s.ph==='start'&&inp.pressed&&s.view!=='story')act({k:'roll',d:1+Math.floor(Math.random()*6)});
         else if(s.ph==='move'&&inp.tap&&now-s.rollAt>900){const {cs,ox,oy}=L(),x=Math.floor((inp.tap[0]-ox)/cs),y=Math.floor((inp.tap[1]-oy)/cs);if(x>=0&&y>=0&&x<GX&&y<GY){const ri=roomAt(x,y),n=ri>=0?RN(ri):y*GX+x;if(reach(me()).includes(n))act({k:'mv',to:n})}}
         else if(s.ph==='act'&&inp.pressed&&!s.view)act({k:'end'});
-        if(s.ph==='act'&&s.inRoom<0&&!s.view&&el>1.2&&!s.endSent){s.endSent=true;act({k:'end'})}
+        if(s.ph==='act'&&s.inRoom<0&&!s.view&&!s.reveal&&!s.witMsg&&el>1.2&&!s.endSent){s.endSent=true;act({k:'end'})}
         if(el>lim){if(s.ph==='start')act({k:'roll',d:1+Math.floor(Math.random()*6)});else if(s.ph==='move'){const R=reach(me());if(!R.length)act({k:'end'});else act({k:'mv',to:R.find(isRoom)||R[R.length-1]})}else if(s.ph==='act'){s.view=null;act({k:'end'})}}}
       if(s.ph!=='act')s.endSent=false;
-      if(s.ph==='reply'&&s.sug&&s.sug.by!==me()){if(el>lim){const g=s.sug,held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[me()].includes(c));act({k:'rp',c:held.length?held[0]:-1})}}
+      if(s.ph==='reply'&&s.sug&&s.sug.chain[s.sug.ci]===me()&&el>lim){const g=s.sug,held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[me()].includes(c));act({k:'rp',c:held.length?held[0]:-1})}
       if(s.ph==='chal'&&s.sug&&s.sug.by===me()&&el>lim)act({k:'ch',v:0});
       if(s.uiDirty||now-(s.rAt||0)>200){s.rAt=now;render()}},
     onRemote(g){},
     onEv(e){if(!s||typeof e.q!=='number'||typeof e.k!=='string')return;const q=Math.floor(e.q);if(q<=s.q||s.pend[q])return;
-      const c={k:e.k,q,w:clamp(Math.floor(num(e.w)),0,1)};['d','to','s','t','r','c','i','v'].forEach(f=>{if(e[f]!=null)c[f]=Math.floor(num(e[f]))});if(Array.isArray(e.cl))c.cl=e.cl.map(x=>clamp(Math.floor(num(x)),0,N-1));else c.cl=null;
+      const c={k:e.k,q,w:clamp(Math.floor(num(e.w)),0,3)};['d','to','s','t','rm','c','i','v','tg'].forEach(f=>{if(e[f]!=null)c[f]=Math.floor(num(e[f]))});c.cl=Array.isArray(e.cl)?e.cl.map(x=>clamp(Math.floor(num(x)),0,N-1)):null;
       if(c.w===s.o.me)return;s.pend[q]=c},
     botHear(e){},
     state(){return{q:s.q}},
-    result(now){if(!s.ended||now-s.endAt<6000)return null;return s.winner===me()?'me':'opp'},
-    summary(){const a=s.acc;return a?((a.w===me()?'내':opName())+' 지목 '+(a.ok?'정답':'오답')+' · 범인 '+CHARS[s.env[0]].name+'·'+TOOLS[s.env[1]-NS].n+'·'+ROOMS[s.env[2]-NS-NT].n):''},
+    result(now){if(!s.ended||now-s.endAt<6500)return null;return s.winner===me()?'me':s.winner===1-me()?'opp':'draw'},
+    summary(){const a=s.acc;return a?(nmP(a.w)+' 지목 '+(a.ok?'정답':'오답')+' · 범인 '+CHARS[s.env[0]].name+'·'+TOOLS[s.env[1]-NS].n+'·'+ROOMS[s.env[2]-NS-NT].n):''},
     hud(now){return{t:s.tn+'턴',c:hudTxt(),cls:mine()?'it':'go'}},
-    button(){if(!mine()||s.ended)return{label:'상대 차례',off:true};if(s.ph==='start')return{label:'굴리기'};if(s.ph==='act'&&!s.anim)return{label:'턴 끝'};return{label:s.ph==='move'?'칸 고르기':'…',off:true}},
+    button(){if(!mine()||s.ended)return{label:'기다려요',off:true};if(s.ph==='start')return{label:'굴리기',off:s.view==='story'};if(s.ph==='act'&&!s.anim)return{label:'턴 끝'};return{label:s.ph==='move'?'칸 고르기':'…',off:true}},
     cleanup(){if(ui){ui.hidden=true;sheet(null)}},
     draw(now){draw(now)}
   }})();
