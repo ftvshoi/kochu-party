@@ -3108,7 +3108,270 @@ const HumanG=(()=>{
       ctx.font='13px Jua, sans-serif';ctx.textAlign='left';ctx.fillStyle='rgba(246,236,220,.8)';ctx.fillText(hd?'내 사랑이에만 점선이 보여요 (상대는 못 봐요)':'사람처럼 움직이는 사랑이를 눌러요',16,H-26)}
   };return G})();
 
-const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG,MemoryG,DanceG,BluffG,HideG,SashimiG,WordG,HumanG];
+/* ================= 게임 26: 코츄 클루도 — 도토리 실종 사건 ================= */
+const ClueG=(()=>{
+  const GX=13,GY=17,NS=7,NT=6,NR=9,N=NS+NT+NR;
+  const TOOLS=[{n:'형 양말',e:'🧦'},{n:'삑삑이 오리',e:'🦆'},{n:'털실 뭉치',e:'🧶'},{n:'큰 숟가락',e:'🥄'},{n:'물 양동이',e:'🪣'},{n:'우산',e:'☂️'}];
+  const ROOMS=[
+    {n:'다락방',e:'📦',x:0,y:0,w:4,h:4,c:'#8d7bb8',d:[[1,4]],p:0},
+    {n:'형 방',e:'🛏️',x:5,y:0,w:3,h:4,c:'#4a5aa0',d:[[6,4]],p:1},
+    {n:'옷장',e:'👕',x:9,y:0,w:4,h:4,c:'#d9a441',d:[[11,4]],p:2},
+    {n:'베란다',e:'🪴',x:0,y:5,w:4,h:3,c:'#6fb795',d:[[4,6]],p:3},
+    {n:'부엌',e:'🍳',x:0,y:9,w:4,h:3,c:'#e98b7a',d:[[4,10],[1,12]],p:4},
+    {n:'목욕탕',e:'🛁',x:9,y:5,w:4,h:7,c:'#86c1e3',d:[[8,8]],p:5},
+    {n:'마당',e:'🌳',x:0,y:13,w:4,h:4,c:'#7fae55',d:[[2,12]],p:3},
+    {n:'거실',e:'🛋️',x:5,y:13,w:3,h:4,c:'#c9784f',d:[[6,12]],p:1},
+    {n:'현관',e:'🚪',x:9,y:13,w:4,h:4,c:'#9a6b45',d:[[11,12],[8,15]],p:2}];
+  const WIT=[{n:'파이리',im:()=>PAIRI,l:'불꽃 구경하다가 봤는데…'},{n:'브케인',im:()=>BCAIN,l:'졸다가 살짝 봤어…'},{n:'갈매기',im:()=>GULL,l:'하늘에서 다 내려다봤지!'}];
+  const CATN=['용의자','도구','장소'],CATC=['#ff8a68','#8cc8ff','#8fe08a'];
+  const cat=c=>c<NS?0:c<NS+NT?1:2;
+  const cName=c=>c<NS?CHARS[c].name:c<NS+NT?TOOLS[c-NS].n:ROOMS[c-NS-NT].n;
+  const cIcon=c=>c<NS?faceHTML(c):'<span class="ce">'+(c<NS+NT?TOOLS[c-NS].e:ROOMS[c-NS-NT].e)+'</span>';
+  const RC=r=>NS+NT+r;
+  const JAR={x:5,y:7,w:3,h:3};
+  const roomAt=(x,y)=>ROOMS.findIndex(R=>x>=R.x&&x<R.x+R.w&&y>=R.y&&y<R.y+R.h);
+  const walk=new Uint8Array(GX*GY);
+  for(let y=0;y<GY;y++)for(let x=0;x<GX;x++)walk[y*GX+x]=roomAt(x,y)<0&&!(x>=JAR.x&&x<JAR.x+JAR.w&&y>=JAR.y&&y<JAR.y+JAR.h)?1:0;
+  const doorOf={};ROOMS.forEach((R,i)=>R.d.forEach(([x,y])=>{const k=y*GX+x;(doorOf[k]=doorOf[k]||[]).push(i)}));
+  const isRoom=n=>n>=1000,RN=r=>1000+r;
+  function nbrs(n){if(isRoom(n))return ROOMS[n-1000].d.map(([x,y])=>y*GX+x);const x=n%GX,y=(n/GX)|0,out=[];
+    for(const [dx,dy] of DIRS){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=GX||ny>=GY)continue;const k=ny*GX+nx;if(walk[k])out.push(k)}(doorOf[n]||[]).forEach(r=>out.push(RN(r)));return out}
+  function bfs(from,block){const dist=new Map([[from,0]]),par=new Map(),q=[from];
+    for(let h=0;h<q.length;h++){const n=q[h];if(n!==from&&isRoom(n))continue;for(const m of nbrs(n)){if(dist.has(m)||m===block)continue;dist.set(m,dist.get(n)+1);par.set(m,n);q.push(m)}}return{dist,par}}
+  function pathTo(from,to,block){const {par}=bfs(from,block);const p=[to];let c=to;while(par.has(c)){c=par.get(c);p.push(c)}return p.reverse()}
+  let s=null,ui=null,cssDone=false;window.__clue={s:()=>s,reach:()=>reach(me()),xy:n=>nodeXY(n,me())};
+  const me=()=>s.o.me,opp=()=>1-s.o.me,mine=()=>s.turn===s.o.me;
+  const blockFor=w=>isRoom(s.pos[1-w])?-1:s.pos[1-w];
+  function reach(w){if(!s.dice)return[];const {dist}=bfs(s.pos[w],blockFor(w));const out=[];dist.forEach((v,k)=>{if(k!==s.pos[w]&&v<=s.dice)out.push(k)});return out}
+  function L(){const top=100,bot=H-142,cs=Math.min((W-16)/GX,(bot-top)/GY),ox=(W-cs*GX)/2,oy=top+((bot-top)-cs*GY)/2;return{cs,ox,oy}}
+  function nodeXY(n,w){const {cs,ox,oy}=L();if(isRoom(n)){const R=ROOMS[n-1000];return[ox+(R.x+R.w/2+(w?.75:-.75))*cs,oy+(R.y+R.h-.75)*cs]}return[ox+(n%GX+.5)*cs,oy+(((n/GX)|0)+.5)*cs]}
+  function log(t){s.log.unshift({tn:s.tn,t})}
+  function setPh(p,now){s.ph=p;s.phAt=now||performance.now();s.uiDirty=true}
+  /* ---------- 이벤트 적용 (양쪽 동일) ---------- */
+  function ap(e,now){now=now||performance.now();s.q++;const w=e.w,who=w===me()?'나':opName(),you=w===me();
+    if(e.k==='roll'){s.dice=e.d;s.rollAt=now;setPh('move',now);beep(500,.08,'square',.04)}
+    else if(e.k==='mv'){const p=pathTo(s.pos[w],e.to,blockFor(w));s.anim={w,p,t0:now};s.pos[w]=e.to;s.dice=0;setPh('act',now);s.inRoom=isRoom(e.to)?e.to-1000:-1;
+      if(isRoom(e.to))log(who+' → '+ROOMS[e.to-1000].n)}
+    else if(e.k==='sg'){const r=isRoom(s.pos[w])?s.pos[w]-1000:0;s.sus[e.s]=r;s.tool[e.t-NS]=r;s.sug={by:w,s:e.s,t:e.t,r,rep:null};s.sugDone=true;setPh('reply',now);
+      bigText((you?'내':opName())+' 추리: '+CHARS[e.s].name+' · '+TOOLS[e.t-NS].n+' · '+ROOMS[r].n,true,1800);beep(660,.15,'triangle',.06)}
+    else if(e.k==='rp'){const g=s.sug;g.rep=e.c;const held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[1-g.by].includes(c));g.lie=e.c<0&&held.length>0;if(g.lie){s.lieLeft[1-g.by]--;s.lies.push({tn:s.tn,by:1-g.by,held})}
+      const tri=CHARS[g.s].name+'·'+TOOLS[g.t-NS].n+'·'+ROOMS[g.r].n;
+      if(g.by===me()){if(e.c>=0){s.auto[e.c]=s.auto[e.c]||'받은 카드';log('내 추리 '+tri+' → '+opName()+'가 「'+cName(e.c)+'」 보여줌');s.reveal={c:e.c,at:now}}else log('내 추리 '+tri+' → '+opName()+': 없어!')}
+      else{log(opName()+' 추리 '+tri+' → 내가 '+(e.c>=0?'「'+cName(e.c)+'」 보여줌':(g.lie?'시치미 뗌 🤫':'없어')))}
+      setPh(e.c>=0?'act':'chal',now);beep(e.c>=0?880:300,.15,'triangle',.06)}
+    else if(e.k==='ch'){const g=s.sug;if(e.v){s.chalLeft[w]--;if(g.lie){s.skip[1-w]=1;const held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[1-w].includes(c));if(w===me())held.forEach(c=>s.auto[c]='들킨 카드');
+          bigText(you?'거짓말 잡았다! 상대 한 턴 쉬기':'시치미 들킴… 한 턴 쉬기',true,2200,!you);log((you?'내가':opName()+'가')+' 거짓말을 잡음! '+(you?'숨긴 카드: '+held.map(cName).join(', '):''));if(you)confetti(W/2,H/2,30)}
+        else{s.skip[w]=1;bigText(you?'진짜 없었어… 내가 한 턴 쉬기':'의심 실패! 상대 한 턴 쉬기',true,2200,you);log((you?'내':opName())+' 의심 실패')}}setPh('act',now)}
+    else if(e.k==='wt'){s.witAsk[w][e.i]=1;const from=s.wit[e.i];s.wit[e.i]=e.to;if(you){const cl=e.cl;if(cl){if(cl.length===1){s.auto[cl[0]]=s.auto[cl[0]]||'목격자'}}log(WIT[e.i].n+': '+(cl?(cl.length===1?'「'+cName(cl[0])+'」는 확실히 아니야':'「'+cName(cl[0])+'」랑 「'+cName(cl[1])+'」 중 적어도 하나는 아니야'):'아무것도 못 봤어…'));s.witMsg={i:e.i,cl,at:now}}
+      else log(opName()+'가 '+WIT[e.i].n+'에게 물어봄 ('+ROOMS[from].n+')');s.uiDirty=true}
+    else if(e.k==='ac'){const ok=e.s===s.env[0]&&e.t===s.env[1]&&e.r===s.env[2];s.acc={w,s:e.s,t:e.t,r:e.r,ok};s.ended=true;s.endAt=now;s.winner=ok?w:1-w;setPh('over',now);
+      if(s.winner===me())confetti(W/2,H/2,60);beep(ok?990:200,.4,ok?'triangle':'sawtooth',.07)}
+    else if(e.k==='end'){let t=1-w;s.tn++;if(s.skip[t]){s.skip[t]=0;log((t===me()?'내':opName())+' 차례 건너뜀');t=1-t;s.tn++}
+      s.turn=t;s.sugDone=false;s.sug=null;s.dice=0;s.reveal=null;s.witMsg=null;s.startNode=s.pos[t];setPh('start',now);if(t===me()){bigText('내 차례!',true,900);beep(880,.12,'triangle',.06)}}
+  }
+  function act(e){e.w=me();e.q=s.q+1;ap(e);if(!s.o.bot)sendEv(e);render()}
+  /* ---------- 목격자 단서 ---------- */
+  function witClue(i,w){const r=Math.random;const known=new Set(s.hand[w]);if(w===me()){for(const c in s.auto)known.add(+c)}else s.bk.known.forEach(c=>known.add(c));
+    const inn=s.hand[1-w].filter(c=>!known.has(c));if(!inn.length)return null;
+    if(r()<.4)return[inn[Math.floor(r()*inn.length)]];
+    const b=inn[Math.floor(r()*inn.length)],k=cat(b);let a;const ev=s.env[k];
+    if(!known.has(ev)&&r()<.5)a=ev;else{const o=inn.filter(c=>c!==b&&cat(c)===k);a=o.length?o[Math.floor(r()*o.length)]:null}
+    if(a==null)return[b];return r()<.5?[a,b]:[b,a]}
+  function witMove(i){const used=s.wit.filter((_,j)=>j!==i);const opts=[];for(let r=0;r<NR;r++)if(r!==s.wit[i]&&!used.includes(r))opts.push(r);return opts[Math.floor(Math.random()*opts.length)]}
+  /* ---------- 컴퓨터 ---------- */
+  function botKnow(){const b=s.bk,w=opp();const kn=new Set(s.hand[w]);b.known.forEach(c=>kn.add(c));return kn}
+  function botSolved(){const kn=botKnow(),res=[];for(let k=0;k<3;k++){const lo=[0,NS,NS+NT][k],hi=[NS,NS+NT,N][k];const cand=[];for(let c=lo;c<hi;c++)if(!kn.has(c))cand.push(c);
+      res.push(s.bk.sure[k]!=null&&!kn.has(s.bk.sure[k])?s.bk.sure[k]:cand.length===1?cand[0]:null)}return res}
+  function botStep(now){const w=opp(),b=s.bk;if(s.ended)return;if(!b.at){b.at=now+900+Math.random()*1300;return}if(now<b.at)return;b.at=0;
+    const doit=e=>{e.w=w;e.q=s.q+1;ap(e,now);render()};
+    if(s.ph==='reply'&&s.sug&&s.sug.by===me()){const g=s.sug,held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[w].includes(c));
+      if(!held.length)doit({k:'rp',c:-1});else if(s.lieLeft[w]>0&&s.tn>4&&Math.random()<.22)doit({k:'rp',c:-1});else doit({k:'rp',c:held[Math.floor(Math.random()*held.length)]});return}
+    if(s.turn!==w||s.anim)return;
+    if(s.ph==='start'){const sv=botSolved();if(sv.every(x=>x!=null)){doit({k:'ac',s:sv[0],t:sv[1],r:sv[2]-NS-NT});return}doit({k:'roll',d:1+Math.floor(Math.random()*6)});return}
+    if(s.ph==='move'){const R=reach(w);if(!R.length){doit({k:'end'});return}const kn=botKnow(),sv=botSolved();const want=[];for(let r=0;r<NR;r++)if(RN(r)!==s.startNode&&(!kn.has(RC(r))||sv[2]!=null))want.push(r);
+      let pick=R.find(n=>isRoom(n)&&want.includes(n-1000));if(pick==null){let best=null,bd=1e9;for(const n of R){for(const r of want){const d=bfs(n,-1).dist.get(RN(r));if(d!=null&&d<bd){bd=d;best=n}}}pick=best!=null?best:R[Math.floor(Math.random()*R.length)]}
+      doit({k:'mv',to:pick});return}
+    if(s.ph==='act'){if(s.inRoom>=0&&!s.sugDone&&RN(s.inRoom)!==s.startNode){const kn=botKnow(),sv=botSolved();
+        const pickC=(lo,hi,k)=>{if(sv[k]!=null){const own=s.hand[w].filter(c=>c>=lo&&c<hi);return own.length&&Math.random()<.7?own[Math.floor(Math.random()*own.length)]:sv[k]}const cand=[];for(let c=lo;c<hi;c++)if(!kn.has(c))cand.push(c);return cand.length?cand[Math.floor(Math.random()*cand.length)]:lo};
+        const wi=s.wit.indexOf(s.inRoom);if(wi>=0&&!s.witAsk[w][wi]){const cl=witClue(wi,w);if(cl&&cl.length===1)b.known.add(cl[0]);doit({k:'wt',i:wi,to:witMove(wi),cl});return}
+        doit({k:'sg',s:pickC(0,NS,0),t:pickC(NS,NS+NT,1)});return}
+      const sv=botSolved();if(sv.every(x=>x!=null)&&Math.random()<.6){doit({k:'ac',s:sv[0],t:sv[1],r:sv[2]-NS-NT});return}doit({k:'end'});return}
+    if(s.ph==='chal'&&s.sug&&s.sug.by===w){const g=s.sug;const cs=[g.s,g.t,RC(g.r)].filter(c=>!s.hand[w].includes(c)&&!b.known.has(c));
+      if(s.chalLeft[w]>0&&cs.length>=2&&Math.random()<.25){doit({k:'ch',v:1});return}
+      if(Math.random()<.65)cs.forEach(c=>{b.sure[cat(c)]=c});doit({k:'ch',v:0});return}
+  }
+  function botHearShown(){const g=s.sug;if(g&&g.by===opp()&&g.rep>=0)s.bk.known.add(g.rep)}
+  /* ---------- UI ---------- */
+  function css(){if(cssDone)return;cssDone=true;const st=document.createElement('style');st.textContent=`
+#clue{position:fixed;inset:0;z-index:8;pointer-events:none;font-family:var(--f-body)}
+#clue .bar{position:fixed;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(30px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;pointer-events:auto}
+#clue .bar button{background:var(--sheet);color:var(--ink);border:2px dashed var(--stitch);box-shadow:0 0 0 3px var(--sheet),0 5px 0 3px rgba(8,6,24,.45);border-radius:14px;padding:9px 10px;font:14px var(--f-disp)}
+#clue .bar button.acc{background:#5a2a35;border-color:rgba(255,160,160,.5);box-shadow:0 0 0 3px #5a2a35,0 5px 0 3px rgba(8,6,24,.45)}
+#clue .bar button[disabled]{opacity:.4}
+#clue .sh{position:fixed;left:0;right:0;bottom:0;max-width:540px;margin:0 auto;max-height:76vh;overflow:auto;pointer-events:auto;background:var(--sheet);border-top:2px dashed var(--stitch);border-radius:22px 22px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.45);padding:14px 14px calc(16px + env(safe-area-inset-bottom,0px));color:var(--ink);animation:clUp .22s ease-out}
+@keyframes clUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+#clue .tt{display:inline-block;background:var(--cream);color:var(--bark);border-radius:8px;padding:5px 12px;font:16px var(--f-disp);border:2px dashed rgba(122,78,54,.35);margin-bottom:8px}
+#clue .sub{font-size:13px;color:var(--mute);margin:2px 0 8px;line-height:1.4}
+#clue .grp{font:13px var(--f-disp);margin:8px 0 4px;color:var(--lamp)}
+#clue .cards{display:flex;flex-wrap:wrap;gap:7px}
+#clue .cc{position:relative;width:66px;min-height:84px;background:#fbf1de;color:#2b1b0b;border-radius:10px;border:0;padding:6px 3px 5px;display:flex;flex-direction:column;align-items:center;gap:3px;font:12px/1.15 var(--f-disp);box-shadow:inset 0 0 0 2px #fbf1de,inset 0 0 0 3.5px rgba(122,78,54,.28),0 3px 0 rgba(0,0,0,.3)}
+#clue .cc::before{content:'';position:absolute;left:0;right:0;top:0;height:5px;border-radius:10px 10px 0 0;background:var(--cc)}
+#clue .cc img{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-top:4px;border:2px solid var(--cc)}
+#clue .cc .ce{font-size:28px;line-height:40px}
+#clue .cc.sel{transform:translateY(-4px);box-shadow:0 0 0 3px var(--lamp),0 6px 0 rgba(0,0,0,.3)}
+#clue .cc[disabled]{opacity:.32}
+#clue .cc .mk{position:absolute;right:2px;top:6px;font-size:11px;background:#2b2643;color:#fff;border-radius:6px;padding:0 4px}
+#clue .cc.held{box-shadow:0 0 0 3px #8fe08a,0 3px 0 rgba(0,0,0,.3)}
+#clue .row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+#clue .row button{flex:1;min-width:120px;border-radius:14px;padding:12px 8px;font:16px var(--f-disp);border:2px dashed rgba(122,78,54,.45);background:var(--lamp);color:var(--bark)}
+#clue .row button.g{background:var(--felt2);color:var(--ink);border-color:var(--stitch)}
+#clue .row button.r{background:#ff8a8a;color:#3a1010}
+#clue .row button[disabled]{opacity:.4}
+#clue .big{display:flex;justify-content:center;margin:6px 0}
+#clue .big .cc{transform:scale(1.5);margin:22px 0;animation:clFlip .5s ease-out}
+@keyframes clFlip{from{transform:scale(1.5) rotateY(90deg)}to{transform:scale(1.5) rotateY(0)}}
+#clue .nb{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:14px}
+#clue .nb .nm{padding:5px 8px;background:rgba(255,244,224,.06);border-radius:8px;display:flex;align-items:center;gap:6px}
+#clue .nb .nm small{color:var(--mute);font-size:11px}
+#clue .nb button{min-width:44px;border-radius:8px;border:1px solid var(--line);background:var(--felt2);color:var(--ink);font:15px var(--f-disp)}
+#clue .nb button.lock{background:#2b2643;color:var(--mute)}
+#clue .log{font-size:13px;line-height:1.5;color:var(--ink);background:rgba(0,0,0,.2);border-radius:10px;padding:8px 10px;margin-top:8px}
+#clue .log div{border-bottom:1px dashed var(--line);padding:3px 0}
+#clue .wit{display:flex;gap:10px;align-items:center;background:#fbf1de;color:#2b1b0b;border-radius:14px;padding:10px;font:15px/1.4 var(--f-disp)}
+#clue .wit img{width:52px;height:52px;border-radius:50%;object-fit:cover;border:3px solid var(--lamp)}
+`;document.head.appendChild(st)}
+  function build(){css();ui=document.createElement('div');ui.id='clue';ui.innerHTML='<div class="bar"><button type="button" data-a="nb">📒 노트</button><button type="button" data-a="hand">🃏 내 카드</button><button type="button" class="acc" data-a="acc">⚖️ 범인 지목</button></div><div class="sh" hidden></div>';
+    document.body.appendChild(ui);
+    ui.addEventListener('click',onClick);['pointerdown','touchstart'].forEach(n=>ui.addEventListener(n,e=>{if(e.target.closest('.sh,.bar'))e.stopPropagation()}))}
+  const MK={'':'',x:'✕',q:'?',o:'★'},MKN={'':'x',x:'q',q:'o',o:''};
+  function mkOf(c){if(s.hand[me()].includes(c))return'내 카드';if(s.auto[c])return s.auto[c];return''}
+  function cardBtn(c,o){o=o||{};const m=mkOf(c),u=s.marks[c]||'';const badge=m?'✕':MK[u];return'<button type="button" class="cc'+(o.sel?' sel':'')+(o.held?' held':'')+'" style="--cc:'+CATC[cat(c)]+'" data-c="'+c+'"'+(o.dis?' disabled':'')+'>'+cIcon(c)+'<span>'+cName(c)+'</span>'+(badge&&!o.nob?'<i class="mk">'+badge+'</i>':'')+'</button>'}
+  function grp(lo,hi,o,title){let h='<div class="grp">'+title+'</div><div class="cards">';for(let c=lo;c<hi;c++)h+=cardBtn(c,o(c));return h+'</div>'}
+  function sheet(h){const sh=ui.querySelector('.sh');if(h==null){sh.hidden=true;sh.innerHTML='';s.shKey='';return}sh.hidden=false;sh.innerHTML=h}
+  function render(){if(!ui||!s)return;s.uiDirty=false;const bar=ui.querySelector('.bar');bar.querySelector('[data-a=acc]').disabled=!(mine()&&(s.ph==='start'||s.ph==='act')&&!s.anim)||s.ended;
+    const v=s.view;let key='';let h=null;
+    if(s.ended){key='over';const a=s.acc,won=s.winner===me();h='<span class="tt">'+(won?'🎉 사건 해결!':'😢 사건 실패')+'</span><div class="sub">'+(a.w===me()?'내':opName())+' 지목: '+CHARS[a.s].name+' · '+TOOLS[a.t-NS].n+' · '+ROOMS[a.r].n+(a.ok?' → 정답!':' → 틀렸어요!')+'</div><div class="grp">진짜 범인 봉투</div><div class="cards">'+cardBtn(s.env[0],{nob:1})+cardBtn(s.env[1],{nob:1})+cardBtn(s.env[2],{nob:1})+'</div>'+(s.lies.length?'<div class="log">'+s.lies.map(l=>'<div>🤫 '+(l.by===me()?'내가':opName()+'가')+' '+l.tn+'턴에 시치미: '+l.held.map(cName).join(', ')+' 숨김</div>').join('')+'</div>':'<div class="sub">이번 판엔 시치미 없었어요</div>')}
+    else if(v==='nb'){key='nb';h='<span class="tt">📒 추리 노트</span><div class="sub">칸을 누르면 ✕ → ? → ★ 순서로 바뀌어요. ✕ 자동 표시: 내 카드·받은 카드·목격자</div><div class="nb">';
+      for(let c=0;c<N;c++){if(c===0||c===NS||c===NS+NT)h+='<div class="grp" style="grid-column:1/3">'+CATN[cat(c)]+'</div>';const m=mkOf(c);h+='<div class="nm">'+cName(c)+(m?' <small>'+m+'</small>':'')+'</div><button type="button" data-m="'+c+'" class="'+(m?'lock':'')+'">'+(m?'✕':MK[s.marks[c]||''])+'</button>'}
+      h+='</div><div class="grp">사건 기록</div><div class="log">'+(s.log.length?s.log.slice(0,30).map(l=>'<div>'+l.tn+'턴 · '+l.t+'</div>').join(''):'아직 없어요')+'</div><div class="row"><button type="button" class="g" data-a="close">닫기</button></div>'}
+    else if(v==='hand'){key='hand';h='<span class="tt">🃏 내 카드 '+s.hand[me()].length+'장</span><div class="sub">이 카드들은 범인 봉투에 없어요. 상대가 추리하면 이 중에서 보여줘요.</div><div class="cards">'+s.hand[me()].map(c=>cardBtn(c,{nob:1})).join('')+'</div><div class="sub">🤫 시치미 남음 '+s.lieLeft[me()]+' · 🤨 의심 남음 '+s.chalLeft[me()]+'</div><div class="row"><button type="button" class="g" data-a="close">닫기</button></div>'}
+    else if(v==='acc'){key='acc'+JSON.stringify(s.pick);const p=s.pick;h='<span class="tt">⚖️ 범인 지목</span><div class="sub">셋 다 맞으면 이기고, <b>하나라도 틀리면 바로 져요.</b></div>'+grp(0,NS,c=>({sel:p.s===c}),'누가')+grp(NS,NS+NT,c=>({sel:p.t===c}),'무엇으로')+grp(NS+NT,N,c=>({sel:p.r===c}),'어디서')+'<div class="row"><button type="button" class="g" data-a="close">취소</button><button type="button" class="r" data-a="accgo"'+(p.s==null||p.t==null||p.r==null?' disabled':'')+'>이걸로 지목!</button></div>'}
+    else if(s.ph==='reply'&&s.sug&&s.sug.by!==me()){const g=s.sug,cs=[g.s,g.t,RC(g.r)],held=cs.filter(c=>s.hand[me()].includes(c));key='rep'+s.q;
+      h='<span class="tt">'+opName()+'의 추리</span><div class="sub">「'+cName(g.s)+'」가 「'+cName(g.t)+'」로 「'+cName(RC(g.r))+'」에서 도토리를 훔쳤다!</div><div class="cards">'+cs.map(c=>cardBtn(c,{held:held.includes(c),dis:!held.includes(c),nob:1})).join('')+'</div><div class="sub">'+(held.length?'초록 테두리 카드 중 하나를 눌러 보여줘요. 아니면 시치미를 뗄 수도 있어요 (들키면 한 턴 쉬기).':'가진 카드가 없어요. "없어"를 눌러요.')+'</div><div class="row"><button type="button" class="'+(held.length?'g':'')+'" data-a="none"'+(held.length&&s.lieLeft[me()]<1?' disabled':'')+'>'+(held.length?'🤫 시치미 "없어" (남음 '+s.lieLeft[me()]+')':'없어')+'</button></div>'}
+    else if(s.ph==='reply'&&s.sug&&s.sug.by===me()){key='wait'+s.q;h='<span class="tt">추리 중…</span><div class="sub">'+opName()+'가 보여줄 카드를 고르는 중이에요</div><div class="cards">'+[s.sug.s,s.sug.t,RC(s.sug.r)].map(c=>cardBtn(c)).join('')+'</div>'}
+    else if(s.ph==='chal'&&s.sug&&s.sug.by===me()){key='chal'+s.q;h='<span class="tt">'+opName()+': "없어!"</span><div class="sub">진짜 없는 걸까요? 거짓말이면 '+opName()+'가 한 턴 쉬고 숨긴 카드가 공개돼요. 진짜면 내가 한 턴 쉬어요.</div><div class="row"><button type="button" class="r" data-a="ch1"'+(s.chalLeft[me()]<1?' disabled':'')+'>🤨 거짓말이지! (남음 '+s.chalLeft[me()]+')</button><button type="button" data-a="ch0">믿을게</button></div>'}
+    else if(s.ph==='chal'){key='chw'+s.q;h='<span class="tt">'+opName()+'가 의심하는 중…</span><div class="sub">들킬까? 두근두근</div>'}
+    else if(mine()&&s.ph==='act'&&!s.anim){key='act'+s.q+(s.reveal?'r':'')+(s.witMsg?'w':'');let top='';
+      if(s.reveal)top='<div class="sub">'+opName()+'가 보여준 카드</div><div class="big">'+cardBtn(s.reveal.c,{nob:1})+'</div>';
+      if(s.witMsg){const wm=s.witMsg,W2=WIT[wm.i];top+='<div class="wit"><img alt="" src="'+W2.im().src+'"><div><b>'+W2.n+'</b>: '+W2.l+'<br>'+(wm.cl?(wm.cl.length===1?'「'+cName(wm.cl[0])+'」는 확실히 아니야!':'「'+cName(wm.cl[0])+'」랑 「'+cName(wm.cl[1])+'」, 둘 중 적어도 하나는 아니야!'):'아무것도 못 봤어…')+'</div></div>'}
+      const inR=s.inRoom>=0,canSug=inR&&!s.sugDone&&RN(s.inRoom)!==s.startNode,wi=inR?s.wit.indexOf(s.inRoom):-1,canW=wi>=0&&!s.witAsk[me()][wi];
+      h='<span class="tt">'+(inR?ROOMS[s.inRoom].e+' '+ROOMS[s.inRoom].n:'복도')+'</span>'+top+'<div class="row">'+(canSug?'<button type="button" data-a="sug">🔍 여기서 추리하기</button>':'')+(canW?'<button type="button" data-a="wit">🗣 '+WIT[wi].n+'에게 묻기</button>':'')+'<button type="button" class="g" data-a="end">턴 끝내기</button></div>'+(inR&&!s.sugDone&&!canSug?'<div class="sub">방금 있던 방에선 다시 추리할 수 없어요</div>':'')}
+    else if(v==='sug'){}
+    if(v==='sug'&&!s.ended&&s.ph==='act'){key='sug'+JSON.stringify(s.pick);const p=s.pick;h='<span class="tt">🔍 '+ROOMS[s.inRoom].n+'에서 추리</span><div class="sub">누가, 무엇으로? '+opName()+'가 셋 중 가진 카드 1장을 보여줘요 (거짓말할 수도!)</div>'+grp(0,NS,c=>({sel:p.s===c}),'누가')+grp(NS,NS+NT,c=>({sel:p.t===c}),'무엇으로')+'<div class="row"><button type="button" class="g" data-a="cancel">취소</button><button type="button" data-a="suggo"'+(p.s==null||p.t==null?' disabled':'')+'>추리!</button></div>'}
+    if(key!==s.shKey){s.shKey=key;sheet(h)}}
+  function onClick(e){const b=e.target.closest('button');if(!b||!s)return;audioInit();const a=b.dataset.a,now=performance.now();
+    if(b.dataset.m!=null){const c=+b.dataset.m;if(mkOf(c))return;s.marks[c]=MKN[s.marks[c]||''];s.shKey='';render();return}
+    if(b.dataset.c!=null){const c=+b.dataset.c;
+      if((s.view==='sug'||s.view==='acc')){const p=s.pick;if(c<NS)p.s=c;else if(c<NS+NT)p.t=c;else if(s.view==='acc')p.r=c;render();return}
+      if(s.ph==='reply'&&s.sug&&s.sug.by!==me()&&s.hand[me()].includes(c)){act({k:'rp',c});return}return}
+    if(a==='nb'||a==='hand'){s.view=s.view===a?null:a;s.shKey='';render();return}
+    if(a==='close'||a==='cancel'){s.view=null;s.shKey='';render();return}
+    if(a==='acc'){if(!mine())return;s.view='acc';s.pick={};render();return}
+    if(a==='accgo'){const p=s.pick;s.view=null;act({k:'ac',s:p.s,t:p.t,r:p.r-NS-NT});return}
+    if(a==='sug'){s.view='sug';s.pick={};render();return}
+    if(a==='suggo'){const p=s.pick;s.view=null;s.reveal=null;s.witMsg=null;act({k:'sg',s:p.s,t:p.t});return}
+    if(a==='wit'){const wi=s.wit.indexOf(s.inRoom);if(wi<0)return;act({k:'wt',i:wi,to:witMove(wi),cl:witClue(wi,me())});return}
+    if(a==='end'){act({k:'end'});return}
+    if(a==='none'){act({k:'rp',c:-1});return}
+    if(a==='ch1'||a==='ch0'){act({k:'ch',v:a==='ch1'?1:0});return}}
+  /* ---------- 그리기 ---------- */
+  function felt(R,x,y,w,h,t){ctx.save();ctx.fillStyle='rgba(0,0,0,.28)';rr(x+2,y+4,w,h,10);ctx.fill();ctx.fillStyle=R.c;rr(x,y,w,h,10);ctx.fill();ctx.save();rr(x,y,w,h,10);ctx.clip();
+    ctx.globalAlpha=.16;ctx.fillStyle='#fff';ctx.strokeStyle='#fff';ctx.lineWidth=3;
+    if(R.p===0){for(let i=-h;i<w;i+=12){ctx.beginPath();ctx.moveTo(x+i,y+h);ctx.lineTo(x+i+h,y);ctx.stroke()}}
+    else if(R.p===1){for(let yy=y+8;yy<y+h;yy+=14)for(let xx=x+8+((yy-y)/14%2)*7;xx<x+w;xx+=14){ctx.beginPath();ctx.arc(xx,yy,2.2,0,7);ctx.fill()}}
+    else if(R.p===2){for(let xx=x+6;xx<x+w;xx+=12)ctx.fillRect(xx,y,4,h)}
+    else if(R.p===3){ctx.lineWidth=2;for(let yy=y+10;yy<y+h;yy+=16)for(let xx=x+10+((yy-y)/16%2)*8;xx<x+w;xx+=16){ctx.beginPath();ctx.ellipse(xx,yy,4,2,.6,0,7);ctx.stroke()}}
+    else if(R.p===4){ctx.globalAlpha=.14;for(let xx=x;xx<x+w;xx+=14)ctx.fillRect(xx,y,7,h);for(let yy=y;yy<y+h;yy+=14)ctx.fillRect(x,yy,w,7)}
+    else if(R.p===5){ctx.lineWidth=1.5;for(let xx=x;xx<x+w;xx+=16){ctx.beginPath();ctx.moveTo(xx,y);ctx.lineTo(xx,y+h);ctx.stroke()}for(let yy=y;yy<y+h;yy+=16){ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(x+w,yy);ctx.stroke()}}
+    ctx.restore();ctx.strokeStyle='rgba(255,244,224,.55)';ctx.lineWidth=1.6;ctx.setLineDash([4,3]);rr(x+4,y+4,w-8,h-8,7);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
+  function draw(now){const t=now/1000,{cs,ox,oy}=L();screen();ctx.fillStyle='#1d1a3a';ctx.fillRect(0,0,W,H);
+    const g0=ctx.createRadialGradient(W/2,H*.45,20,W/2,H*.45,Math.max(W,H)*.7);g0.addColorStop(0,'rgba(255,213,154,.12)');g0.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g0;ctx.fillRect(0,0,W,H);
+    // 바닥 매트
+    const bw=cs*GX,bh=cs*GY;ctx.fillStyle='rgba(0,0,0,.35)';rr(ox-6,oy-2,bw+12,bh+12,16);ctx.fill();ctx.fillStyle='#7a4e36';rr(ox-7,oy-7,bw+14,bh+14,16);ctx.fill();
+    ctx.fillStyle='#ead9b8';rr(ox-2,oy-2,bw+4,bh+4,12);ctx.fill();ctx.strokeStyle='rgba(255,244,224,.6)';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);rr(ox-4.5,oy-4.5,bw+9,bh+9,14);ctx.stroke();ctx.setLineDash([]);
+    // 복도 칸
+    for(let y=0;y<GY;y++)for(let x=0;x<GX;x++){if(!walk[y*GX+x])continue;const px=ox+x*cs,py=oy+y*cs;ctx.fillStyle=(x+y)%2?'#e2cfa9':'#e9d8b6';ctx.fillRect(px+1,py+1,cs-2,cs-2);ctx.strokeStyle='rgba(122,78,54,.22)';ctx.lineWidth=1;ctx.setLineDash([2,2]);ctx.strokeRect(px+3,py+3,cs-6,cs-6);ctx.setLineDash([])}
+    // 도토리 단지
+    {const jx=ox+(JAR.x+.15)*cs,jy=oy+(JAR.y+.1)*cs,jw=cs*2.7,jh=cs*2.8;ctx.fillStyle='rgba(0,0,0,.25)';rr(jx+2,jy+4,jw,jh,14);ctx.fill();ctx.fillStyle='#5a3a26';rr(jx,jy,jw,jh,14);ctx.fill();ctx.fillStyle='rgba(180,220,255,.25)';rr(jx+8,jy+14,jw-16,jh-22,12);ctx.fill();ctx.fillStyle='#c9772f';rr(jx+10,jy+4,jw-20,12,5);ctx.fill();
+      drawAcorn(jx+jw/2,jy+jh*.55,t,1.4);ctx.fillStyle='#fbf1de';ctx.font='12px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('범인 봉투',jx+jw/2,jy+jh-8);ctx.fillStyle='#ffd47a';ctx.font='20px Jua, sans-serif';ctx.fillText('?',jx+jw/2+18,jy+jh*.4)}
+    // 방
+    ROOMS.forEach((R,i)=>{const x=ox+R.x*cs+2,y=oy+R.y*cs+2,w=R.w*cs-4,h=R.h*cs-4;felt(R,x,y,w,h,t);
+      ctx.font=Math.round(cs*.95)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.globalAlpha=.85;ctx.fillText(R.e,x+w/2,y+h*.42);ctx.globalAlpha=1;ctx.textBaseline='alphabetic';
+      ctx.font='12px Jua, sans-serif';const tw=ctx.measureText(R.n).width+12;ctx.fillStyle='#fbf1de';rr(x+5,y+5,tw,17,5);ctx.fill();ctx.fillStyle='#3a2414';ctx.textAlign='left';ctx.fillText(R.n,x+11,y+18);
+      R.d.forEach(([dx,dy])=>{const px=ox+(dx+.5)*cs,py=oy+(dy+.5)*cs;ctx.fillStyle='rgba(122,78,54,.35)';ctx.beginPath();ctx.arc(px,py,cs*.3,0,7);ctx.fill();ctx.fillStyle='#fbf1de';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText('🚪',px,py+4)});
+      // 용의자·도구 말
+      const items=[];CHARS.forEach((c,k)=>{if(s.sus[k]===i)items.push({ch:k})});TOOLS.forEach((tl,k)=>{if(s.tool[k]===i)items.push({e:tl.e})});
+      items.forEach((it,k)=>{const cols=Math.max(1,Math.floor((w-8)/18)),ix=x+12+(k%cols)*18,iy=y+30+Math.floor(k/cols)*18;if(it.ch!=null)drawToken(ix,iy,it.ch,{scale:.5});else{ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText(it.e,ix,iy+5)}});
+      const wi=s.wit.indexOf(i);if(wi>=0){const im=WIT[wi].im(),wx=x+w-16,wy=y+h-38+Math.sin(t*2+i)*2;ctx.save();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(wx,wy,12,0,7);ctx.fill();if(im.complete&&im.naturalWidth){ctx.beginPath();ctx.arc(wx,wy,10.5,0,7);ctx.clip();ctx.drawImage(im,wx-10.5,wy-10.5,21,21)}ctx.restore();
+        if(!s.witAsk[me()][wi]){ctx.fillStyle='#ffd47a';ctx.font='12px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('💬',wx+11,wy-10)}}});
+    // 이동 가능 칸
+    if(mine()&&s.ph==='move'&&!s.anim){const pulse=.45+.3*Math.sin(t*6);reach(me()).forEach(n=>{if(isRoom(n)){const R=ROOMS[n-1000];ctx.strokeStyle='rgba(255,212,122,'+pulse+')';ctx.lineWidth=4;rr(ox+R.x*cs+2,oy+R.y*cs+2,R.w*cs-4,R.h*cs-4,10);ctx.stroke()}
+      else{const x=n%GX,y=(n/GX)|0;ctx.fillStyle='rgba(255,212,122,'+(pulse*.6)+')';rr(ox+x*cs+3,oy+y*cs+3,cs-6,cs-6,6);ctx.fill()}})}
+    // 탐정 말
+    [0,1].forEach(w=>{let [x,y]=nodeXY(s.pos[w],w);if(s.anim&&s.anim.w===w){const k=(now-s.anim.t0)/140,p=s.anim.p;if(k>=p.length-1)s.anim=null;else{const i=Math.floor(k),f=k-i,[ax,ay]=nodeXY(p[i],w),[bx,by]=nodeXY(p[i+1],w);x=ax+(bx-ax)*f;y=ay+(by-ay)*f-Math.sin(f*Math.PI)*6}}
+      if(!isRoom(s.pos[w])&&s.pos[0]===s.pos[1])x+=w?5:-5;const mineW=w===me();drawToken(x,y,mineW?s.o.myC:s.o.oppC,{scale:.78,col:mineW?'#ff8a68':'#7ec6ff',bob:t*3+w});
+      ctx.fillStyle='#3a2414';ctx.beginPath();ctx.ellipse(x,y-11,9,3.5,0,0,7);ctx.fill();ctx.fillStyle='#8a5a3a';ctx.beginPath();ctx.ellipse(x,y-14,6,5,0,Math.PI,0);ctx.fill();
+      if(s.turn===w&&!s.ended){ctx.fillStyle=mineW?'#ff8a68':'#7ec6ff';ctx.font='12px Jua, sans-serif';ctx.textAlign='center';ctx.fillText('▼',x,y-22+Math.sin(t*6)*2)}});
+    // 주사위
+    if(s.rollAt&&now-s.rollAt<1300){const e=(now-s.rollAt)/1300,sz=64,cx=W/2,cy=oy+bh/2;const face=e<.6?1+Math.floor((now/70)%6):s.dice||1;ctx.save();ctx.translate(cx,cy);ctx.rotate(e<.6?Math.sin(now/40)*.5:0);
+      ctx.fillStyle='rgba(0,0,0,.35)';rr(-sz/2+3,-sz/2+6,sz,sz,14);ctx.fill();ctx.fillStyle='#fbf1de';rr(-sz/2,-sz/2,sz,sz,14);ctx.fill();ctx.strokeStyle='rgba(122,78,54,.5)';ctx.setLineDash([4,3]);ctx.lineWidth=2;rr(-sz/2+5,-sz/2+5,sz-10,sz-10,10);ctx.stroke();ctx.setLineDash([]);
+      const P=[[],[[0,0]],[[-1,-1],[1,1]],[[-1,-1],[0,0],[1,1]],[[-1,-1],[1,-1],[-1,1],[1,1]],[[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],[[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]]][face];
+      ctx.fillStyle='#c9772f';P.forEach(([a,b])=>{ctx.beginPath();ctx.arc(a*15,b*15,6,0,7);ctx.fill()});ctx.restore()}
+    drawBubble(W*.2,96,C.bub.op,now);drawParts()}
+  function hudTxt(){if(s.ended)return s.winner===me()?'사건 해결!':'사건 실패';const ti=Math.max(0,Math.ceil(LIM[s.ph]-(performance.now()-s.phAt)/1000));
+    if(s.ph==='reply')return s.sug&&s.sug.by===me()?opName()+' 대답 기다리는 중':'카드 보여줘요 '+ti+'초';
+    if(s.ph==='chal')return s.sug&&s.sug.by===me()?'의심할까? '+ti+'초':opName()+' 고민 중';
+    if(!mine())return opName()+' 차례';return s.ph==='start'?'주사위 굴려요 '+ti+'초':s.ph==='move'?'갈 칸을 눌러요 '+ti+'초':'내 차례 '+ti+'초'}
+  const LIM={start:45,move:45,act:90,reply:35,chal:20,over:99};
+  return{
+    id:'clue',name:'코츄 클루도',btn:'굴리기',stat:null,tapPos:true,
+    rules:['도토리 단지에서 도토리가 사라졌다! 범인 봉투엔 누가 · 무엇으로 · 어디서 카드가 1장씩 숨겨져 있어요. 나머지 카드는 둘이 나눠 가져요.','주사위를 굴려 방에 들어가면 추리! 상대는 셋 중 가진 카드 1장을 보여줘야 해요. 단, 한 판에 1번은 🤫 시치미("없어")를 뗄 수 있어요. 의심해서 잡으면 상대가 한 턴 쉬고, 틀리면 내가 쉬어요.','방에 있는 목격자(파이리·브케인·갈매기)에게 물으면 단서를 줘요. ⚖️ 범인 지목은 언제든 내 차례에 — 맞히면 승리, 틀리면 바로 패배!'],
+    init(o){const r=mulberry32(o.seed^0xc1ed0);const env=[Math.floor(r()*NS),NS+Math.floor(r()*NT),NS+NT+Math.floor(r()*NR)];const rest=[];for(let c=0;c<N;c++)if(!env.includes(c))rest.push(c);shuffle(rest,r);
+      const first=(o.seed>>>4)&1,hand=[[],[]];rest.forEach((c,i)=>hand[(i+first+1)%2].push(c));hand.forEach(h=>h.sort((a,b)=>a-b));
+      const rooms=shuffle([0,1,2,3,4,5,6,7,8],r);
+      s={o,env,hand,turn:first,tn:1,q:0,ph:'start',phAt:o.now,pos:[16*GX+4,0*GX+8],sus:CHARS.map(()=>Math.floor(r()*NR)),tool:TOOLS.map(()=>Math.floor(r()*NR)),wit:rooms.slice(0,3),witAsk:[[0,0,0],[0,0,0]],
+        lieLeft:[1,1],chalLeft:[2,2],skip:[0,0],sug:null,sugDone:false,inRoom:-1,dice:0,rollAt:0,anim:null,log:[],marks:{},auto:{},lies:[],view:null,pick:{},shKey:'',pend:{},ended:false,endAt:0,winner:-1,startNode:-1,
+        bk:{at:0,known:new Set(),sure:{}}};s.startNode=s.pos[s.turn];
+      if(!ui)build();ui.hidden=false;s.shKey='x';render();bigText(s.turn===o.me?'내가 먼저!':opName()+'가 먼저!',true,1300)},
+    step(dt,now,inp){if(!s)return;
+      while(s.pend[s.q+1]){const e=s.pend[s.q+1];delete s.pend[s.q+1];ap(e,now);s.uiDirty=true}
+      if(s.o.bot){botStep(now);botHearShown()}
+      if(s.ended){if(s.uiDirty)render();return}
+      const el=(now-s.phAt)/1000,lim=LIM[s.ph]||60;
+      if(mine()&&!s.anim){if(s.ph==='start'&&inp.pressed){act({k:'roll',d:1+Math.floor(Math.random()*6)})}
+        else if(s.ph==='move'&&inp.tap&&now-s.rollAt>900){const {cs,ox,oy}=L(),x=Math.floor((inp.tap[0]-ox)/cs),y=Math.floor((inp.tap[1]-oy)/cs);if(x>=0&&y>=0&&x<GX&&y<GY){const ri=roomAt(x,y),n=ri>=0?RN(ri):y*GX+x;if(reach(me()).includes(n))act({k:'mv',to:n})}}
+        else if(s.ph==='act'&&inp.pressed&&!s.view)act({k:'end'});
+        if(s.ph==='act'&&s.inRoom<0&&!s.view&&el>1.2&&!s.endSent){s.endSent=true;act({k:'end'})}
+        if(el>lim){if(s.ph==='start')act({k:'roll',d:1+Math.floor(Math.random()*6)});else if(s.ph==='move'){const R=reach(me());if(!R.length)act({k:'end'});else act({k:'mv',to:R.find(isRoom)||R[R.length-1]})}else if(s.ph==='act'){s.view=null;act({k:'end'})}}}
+      if(s.ph!=='act')s.endSent=false;
+      if(s.ph==='reply'&&s.sug&&s.sug.by!==me()){if(el>lim){const g=s.sug,held=[g.s,g.t,RC(g.r)].filter(c=>s.hand[me()].includes(c));act({k:'rp',c:held.length?held[0]:-1})}}
+      if(s.ph==='chal'&&s.sug&&s.sug.by===me()&&el>lim)act({k:'ch',v:0});
+      if(s.uiDirty||now-(s.rAt||0)>200){s.rAt=now;render()}},
+    onRemote(g){},
+    onEv(e){if(!s||typeof e.q!=='number'||typeof e.k!=='string')return;const q=Math.floor(e.q);if(q<=s.q||s.pend[q])return;
+      const c={k:e.k,q,w:clamp(Math.floor(num(e.w)),0,1)};['d','to','s','t','r','c','i','v'].forEach(f=>{if(e[f]!=null)c[f]=Math.floor(num(e[f]))});if(Array.isArray(e.cl))c.cl=e.cl.map(x=>clamp(Math.floor(num(x)),0,N-1));else c.cl=null;
+      if(c.w===s.o.me)return;s.pend[q]=c},
+    botHear(e){},
+    state(){return{q:s.q}},
+    result(now){if(!s.ended||now-s.endAt<6000)return null;return s.winner===me()?'me':'opp'},
+    summary(){const a=s.acc;return a?((a.w===me()?'내':opName())+' 지목 '+(a.ok?'정답':'오답')+' · 범인 '+CHARS[s.env[0]].name+'·'+TOOLS[s.env[1]-NS].n+'·'+ROOMS[s.env[2]-NS-NT].n):''},
+    hud(now){return{t:s.tn+'턴',c:hudTxt(),cls:mine()?'it':'go'}},
+    button(){if(!mine()||s.ended)return{label:'상대 차례',off:true};if(s.ph==='start')return{label:'굴리기'};if(s.ph==='act'&&!s.anim)return{label:'턴 끝'};return{label:s.ph==='move'?'칸 고르기':'…',off:true}},
+    cleanup(){if(ui){ui.hidden=true;sheet(null)}},
+    draw(now){draw(now)}
+  }})();
+
+const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG,MemoryG,DanceG,BluffG,HideG,SashimiG,WordG,HumanG,ClueG];
 
 /* ================= 입력 ================= */
 const In={mx:0,my:0,mag:0,pressed:false,held:false};const J={active:false,id:-1,ox:0,oy:0,sx:0,sy:0,dx:0,dy:0,mag:0};const K={};
