@@ -1167,6 +1167,7 @@ const FireG=(()=>{
 
 /* ================= 게임 9: O/X 퀴즈 ================= */
 const QUIZ=[
+['형은 누나한테 삐졌다.',1,'형이 직접 말했어요. 삐졌대요 😤','first'],
 ['강아지는 눈을 감은 채로 태어난다.',1,'보통 생후 10~14일쯤 눈을 떠요.'],
 ['갓 태어난 강아지는 귀도 닫혀 있어 소리를 거의 못 듣는다.',1,'귀는 생후 2주 무렵부터 열려요.'],
 ['개의 땀샘(에크린샘)은 주로 발바닥에 있다.',1,'더운 날 발바닥이 촉촉해지는 이유예요.'],
@@ -1580,7 +1581,7 @@ const QuizG=(()=>{
   return{
     id:'quiz',name:'코츄 O/X 퀴즈',btn:'멍!',stat:null,stick:true,
     rules:['문제를 보고 O 또는 X 쪽 바닥으로 가요. 하트 3개, 틀릴 때마다 하나씩 잃어요.','하트를 먼저 다 잃으면 탈락! 코츄 비밀 이야기 문제는 처음 듣는 이야기라 감으로 맞혀야 해요.','멍!으로 상대를 반대편으로 밀어낼 수 있어요. 한 판에 한 번, 문제 중에 버튼을 꾹 누르면 🔥 올인! 맞히면 상대 하트 -1, 틀리면 내 하트 -2.'],
-    init(o){const r=mulberry32(o.seed^0xc2b2ae35),L=shuffle(QUIZ.map((_,i)=>i).filter(i=>QUIZ[i][3]==='lore'),r).slice(0,12),F=shuffle(QUIZ.map((_,i)=>i).filter(i=>QUIZ[i][3]!=='lore'),r).slice(0,NQ-12),idx=shuffle(L.concat(F),r),a=o.me?1:-1;
+    init(o){const r=mulberry32(o.seed^0xc2b2ae35),L=shuffle(QUIZ.map((_,i)=>i).filter(i=>QUIZ[i][3]==='lore'),r).slice(0,12),F=shuffle(QUIZ.map((_,i)=>i).filter(i=>QUIZ[i][3]!=='lore'&&QUIZ[i][3]!=='first'),r).slice(0,NQ-13),idx=[0].concat(shuffle(L.concat(F),r)),a=o.me?1:-1;
       s={o,t0:o.now,qs:idx,d:derive(o.myC),od:derive(o.oppC),me:{x:a*40,y:120,fall:0},op:{x:-a*40,y:120,fall:0,ok:o.bot},cr:[],ocr:[],allin:null,oall:null,judged:-1,cdB:0,hold:0,ended:false,endAt:0,shown:-1,
         bot:o.bot?{cdB:1,plan:[],tx:0}:null};
       if(o.bot){s.bot.plan=idx.map(i=>{const right=Math.random()<.65;return{right,side:(QUIZ[i][1]?1:0)===(right?1:0)?-1:1,flip:Math.random()<.2,at:2+Math.random()*2.5}});const cand=s.bot.plan.map((p,i)=>p.right&&!p.flip&&i>2?i:-1).filter(i=>i>=0);s.bot.allAt=cand.length&&Math.random()<.7?cand[Math.floor(Math.random()*cand.length)]:-1}},
@@ -3559,7 +3560,7 @@ const ClueG=(()=>{
     draw(now){draw(now)}
   }})();
 
-const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG,MemoryG,DanceG,BluffG,HideG,SashimiG,WordG,HumanG,ClueG];
+const GAMES=[TagG,PillowG,RhythmG,TowerG,StealG,SnoreG,BagG,FireG,QuizG,SpotG,BalloonG,RaceG,OhoriG,WakeG,GolfG,NeckG,LiarG,TotoG,MemoryG,DanceG,BluffG,HideG,SashimiG,WordG,HumanG];
 
 /* ================= 입력 ================= */
 const In={mx:0,my:0,mag:0,pressed:false,held:false};const J={active:false,id:-1,ox:0,oy:0,sx:0,sy:0,dx:0,dy:0,mag:0};const K={};
@@ -3585,7 +3586,7 @@ function readInput(){const kx=(K.ArrowRight||K.d?1:0)-(K.ArrowLeft||K.a?1:0),ky=
 
 /* ================= 판 진행 ================= */
 const show=(ids,on)=>ids.forEach(id=>$('#'+id).hidden=!on);
-function pickGame(r){if(C.forceG!=null)return GAMES[C.forceG];if(C.M&&C.M.chosen&&C.M.chosen.r===r)return GAMES[C.M.chosen.g];if(C.M&&C.M.bot&&C.soloPick>=0)return GAMES[C.soloPick];const n=GAMES.length;const ord=c=>shuffle(GAMES.map((_,i)=>i),mulberry32((C.M.seed+c*7919)>>>0));const c=Math.floor((r-1)/n);let o=ord(c);
+function pickGame(r){if(C.forceG!=null)return GAMES[C.forceG];if(r===1)return QuizG;if(C.M&&C.M.chosen&&C.M.chosen.r===r)return GAMES[C.M.chosen.g];if(C.M&&C.M.bot&&C.soloPick>=0)return GAMES[C.soloPick];const n=GAMES.length;const ord=c=>shuffle(GAMES.map((_,i)=>i),mulberry32((C.M.seed+c*7919)>>>0));const c=Math.floor((r-1)/n);let o=ord(c);
   if(c>0){const prev=ord(c-1);if(o[0]===prev[n-1])[o[0],o[1]]=[o[1],o[0]]}return GAMES[o[(r-1)%n]]}
 function roundSeed(r){return((C.M.seed^Math.imul(r,2654435761))>>>0)||1}
 function startMatch(seed,idx,oppC,bot){C.M={seed,idx,round:0,pts:[0,0],target:5,oppC,bot};C.evq=[];{const q=Net.peer();C.emoSeen=q&&q.emo?num(q.emo.n):0}
